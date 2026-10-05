@@ -2,16 +2,16 @@
 
 > **Status: exploration, not the design.** What `aqm predict` actually does today is in `DESIGN.md` next to this file — a two-line extrapolation of the recent rate. This document records the eight forecasting approaches considered for replacing it, each judged on its own against the requirements of §1.2, with its own independent drawbacks and no preferred option. Any of them would write the same prediction artifact (`DESIGN.md` §1), so adopting one changes no other stage.
 
-Candidate designs for the `organic_usage_predictor`, the component that forecasts the user's organic (interactive) usage for the planner of `../DESIGN_v1.md` §2. It runs every 30 minutes, once per agent (Claude, Codex). This file records every approach considered, with its strengths and its drawbacks, each approach judged on its own against the requirements of §1.2.
+Candidate designs for the `organic_usage_predictor`, the component that forecasts the user's human (interactive) usage for the planner of `../DESIGN_v1.md` §2. It runs every 30 minutes, once per agent (Claude, Codex). This file records every approach considered, with its strengths and its drawbacks, each approach judged on its own against the requirements of §1.2.
 
 ## 1. What the predictor must produce
 
-The system ultimately decides on two quantities: the quota remaining at the end of the current 5-hour window, and the quota remaining at the end of the 7-day period. The predictor supplies the organic half of both; the planner adds the extra work and the 5-hour caps, because how much of the user's demand can actually be spent depends on the extra work placed in each window.
+The system ultimately decides on two quantities: the quota remaining at the end of the current 5-hour window, and the quota remaining at the end of the 7-day period. The predictor supplies the human half of both; the planner adds the extra work and the 5-hour caps, because how much of the user's demand can actually be spent depends on the extra work placed in each window.
 
 | Output | Used by | Precision needed |
 |---|---|---|
-| Distribution of `demand_5h`: organic demand from now until the end of the current 5-hour window, and P(the window saturates) | Window guard: how much extra work fits now without blocking the user | High |
-| Distribution of `demand_7d`: organic demand from now until the end of the 7-day period | Planner: `reserve` and `extra` | Low beyond a day or two |
+| Distribution of `demand_5h`: human demand from now until the end of the current 5-hour window, and P(the window saturates) | Window guard: how much extra work fits now without blocking the user | High |
+| Distribution of `demand_7d`: human demand from now until the end of the 7-day period | Planner: `reserve` and `extra` | Low beyond a day or two |
 | `activity_probability(t)` for every future slot | Planner: which slots are cheap for extra work | Medium |
 
 Whether these outputs are needed at all depends on the scheduling policy: a fixed nightly top-up needs none of them, and an away-day signal alone may capture most of the gain. See `../03_budgeting/PREVIOUS_IDEAS.md`.
@@ -63,7 +63,7 @@ The horizons do not need the same precision:
 | `day_bucket(t)` | Same time of day as `t`, on every past day | "any day, 14:00–14:30" |
 | `spend(t)` | Organic spend in past slot `t`, in units | |
 | `pace(t)` | The user's recent spend rate just before `t` (e.g. spend over the last hour) | |
-| Active slot | At least one organic message in the slot | |
+| Active slot | At least one human message in the slot | |
 | Blocked slot | The 5-hour meter was at 100% during the slot: the user could not work | |
 | Inactive slot | Neither active nor blocked | |
 | Engaged day | A day of normal working life (nights and breaks included) | |
@@ -80,7 +80,7 @@ The horizons do not need the same precision:
 
 ## 3. Approach A — Active/inactive Markov chain
 
-The user is active or inactive in each slot, and the probability of switching depends on the hour of the week: `p_start(bucket)` = P(active next slot | inactive now), `p_stay(bucket)` = P(active next slot | active now). Spend of an active slot is drawn from a per-bucket distribution, multiplied by a recent intensity factor that decays back to 1. The forecast starts from the current state and propagates slot by slot until the reset.
+The user is active or inactive in each slot, and the probability of switching depends on the hour of the week: `p_start(slot)` = P(active next slot | inactive now), `p_stay(slot)` = P(active next slot | active now). Spend of an active slot is drawn from a per-slot distribution, multiplied by a recent intensity factor that decays back to 1. The forecast starts from the current state and propagates slot by slot until the reset.
 
 Computation: originally N = 1000 simulated futures. Simulation is not required: `P(active)` per slot comes from forward recursion of the state probabilities, and the distribution of any sum from dynamic programming over (state, cumulative demand on a grid), deterministically and in milliseconds (§13).
 
@@ -99,7 +99,7 @@ Same mean, much narrower spread. A model that treats slots as independent keeps 
 
 ### 3.2 Drawbacks
 
-- **Too many quantities for the data:** 2 × 336 transition probabilities and 336 spend distributions, from about 4 examples per bucket. Rare transitions (starting to work at 03:00, stopping at 15:00 on a Sunday) are estimated from 0–2 events; pooling across buckets is needed and not specified.
+- **Too many quantities for the data:** 2 × 336 transition probabilities and 336 spend distributions, from about 4 examples per slot. Rare transitions (starting to work at 03:00, stopping at 15:00 on a Sunday) are estimated from 0–2 events; pooling across slots is needed and not specified.
 - **One slot of memory:** the chain does not know how long the session has lasted or how much the user already worked today, so session lengths are memoryless (a 10-minute session and a 6-hour one are equally likely to stop next slot).
 - **Binary activity:** one tiny message makes a slot as "active" as an intense one; the spend of consecutive active slots is drawn independently, so a heavy session is not expected to stay heavy.
 - **No day-level state or recent activity factor:** an away user is still expected to start working at the usual hours (R5 fails); only the intensity has a recent factor.
@@ -128,7 +128,7 @@ A single time-series model over 30-minute spend, with seasonal period 336 (one w
 
 ## 5. Approach C — Hierarchical averaging with a recent scaling factor
 
-Proposed by the user: a daily profile (48 buckets) as the base prior, refined by weekday profiles (7 × 48 buckets, unstable), the two averaged; a recent "current scaling factor" (recent observed / expected, exponentially weighted) applied to the near future with the same exponential decay.
+Proposed by the user: a daily profile (48 slots) as the base prior, refined by weekday profiles (7 × 48 slots, unstable), the two averaged; a recent "current scaling factor" (recent observed / expected, exponentially weighted) applied to the near future with the same exponential decay.
 
 **Strengths:** simple, explainable, few parameters, robust with little data; the multiplicative factor keeps nights at zero.
 
@@ -197,7 +197,7 @@ demand(t)               = 0                                   with probability 1
 - **Intensity assumed non-seasonal:** not verified on the data.
 - **`m(t)` scales every draw:** a high `factor_recent_intensity` stretches the whole intensity distribution, including its tail, which can overstate the p95.
 - **Blocked slots excluded:** removing them from the intensity prior and the factors drops the heaviest moments and biases intensity downward.
-- **`week_bucket` sparsity:** about 4 observations per bucket, handled by shrinkage with `k_season`.
+- **`week_bucket` sparsity:** about 4 observations per slot, handled by shrinkage with `k_season`.
 
 ## 7. Approach E — Seasonal spend distribution scaled by one recent factor
 
@@ -278,7 +278,7 @@ A variant applies the same weights to past rolling totals over `H` consecutive s
 
 ## 9. Approach G — F's weights with spend-level transitions
 
-Adds slot-to-slot correlation to F with a Markov chain on spend levels (Approach A with F's weights instead of fixed buckets, and several levels instead of active/inactive).
+Adds slot-to-slot correlation to F with a Markov chain on spend levels (Approach A with F's weights instead of fixed slots, and several levels instead of active/inactive).
 
 - **Levels:** spend per slot cut into 0 / L / M / H, boundaries from quantiles of active-slot spend.
 - **Transitions:** every past pair of consecutive slots is one example. `T_t[x → y]` = weighted share of pairs going from level `x` to level `y`, with F's weights for slot `t` (time-of-day bell, weekday bump, recent days weighing more), blended with all-hours transitions when examples are few: `(weighted counts + k × T_all) / (n + k)`.
@@ -299,7 +299,7 @@ Adds slot-to-slot correlation to F with a Markov chain on spend levels (Approach
 
 ## 10. Approach H — Weighted past totals conditioned on the current pace
 
-Forecasts the quantity the window guard needs, the cumulative organic demand until the end of the current 5-hour window, directly from past totals over the same duration. The past totals already contain the sessions, so the independence problem does not arise, and no discretization is needed.
+Forecasts the quantity the window guard needs, the cumulative human demand until the end of the current 5-hour window, directly from past totals over the same duration. The past totals already contain the sessions, so the independence problem does not arise, and no discretization is needed.
 
 ### 10.1 Method
 
@@ -308,7 +308,7 @@ H        = time left in the current 5h window (the next 5h if no window is open)
 pace(x)  = the user's spend over the hour before x (or exponentially weighted, 2h half-life)
 
 for every past start s (every 30 min, window [s, s+H] entirely in the past):
-    Y(s)      = organic demand over [s, s+H]          # blocked slots imputed at the pre-cap pace
+    Y(s)      = human demand over [s, s+H]          # blocked slots imputed at the pre-cap pace
     weight(s) = bell(time of day of s vs now)          # time-of-day similarity
               × weekday_bump                           # same weekday
               × 0.5^(age / regime_halflife)            # last days count more
@@ -421,7 +421,7 @@ No approach meets every requirement; the two horizons may be served by different
 
 ## 17. Open points
 
-- **Behaviour depends on the quota:** the user may ration usage when quota is low (end of week, after a heavy day). Observed demand is then not independent of the quota state, and extra work that lowers the quota may itself reduce organic usage.
+- **Behaviour depends on the quota:** the user may ration usage when quota is low (end of week, after a heavy day). Observed demand is then not independent of the quota state, and extra work that lowers the quota may itself reduce human usage.
 - **Feedback from extra work:** once the system runs, its extra work will sometimes cap the user, so blocked slots become more frequent in the history and their handling (exclusion, imputation) weighs more on every approach.
 - **Current slot:** whether the partial spend of `t0` is used as an observation (it is the freshest information on the session).
 - **Blocked-slot detection:** the resolution of the quota history may be coarser than a 30-minute slot.

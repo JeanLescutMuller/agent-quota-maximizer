@@ -31,11 +31,11 @@ aqm plan    --budget /tmp/b.json --out /tmp/q.json
 aqm execute --plan /tmp/q.json --dry-run
 ```
 
-Ingested history has no flag either: `state/meter-<agent>.jsonl` and `state/buckets.jsonl` are the only place it lives (`../01_ingestion/DESIGN.md` §6), and tests pass a path through the Python API rather than the CLI. There is no `--agent` flag either: every stage covers **all configured agents** and writes one artifact per tick holding a section per agent, so the chain stays one file per step. `execute` takes no agent, amount or deadline either: the plan artifact already carries the mandate for every agent.
+Ingested history has no flag either: `data/<agent>/meter.csv` and `data/<agent>/slots.csv` are the only place it lives (`../01_ingestion/DESIGN.md` §6), and tests pass a path through the Python API rather than the CLI. There is no `--agent` flag either: every stage covers **all configured agents** and writes one artifact per tick holding a section per agent, so the chain stays one file per step. `execute` takes no agent, amount or deadline either: the plan artifact already carries the mandate for every agent.
 
 **Inputs default to the latest artifact**, resolved through `state/latest/<kind>.json`, which is why `--prediction`, `--budget` and `--plan` are optional: a hand-run stage needs no arguments, and the flags exist to point at a fixture, a past artifact or an experimental predictor. Two rules keep that default honest:
 
-- **Stale inputs are refused.** An input artifact older than `MAX_INPUT_AGE` produces "stale prediction" / "stale budget" / "stale plan" rather than a silent decision on old data — the case that matters is a stage having failed on the previous tick. `--force` overrides it.
+- **Stale inputs are refused.** An input artifact older than `ARTIFACT_MAX_AGE_SECONDS` produces "stale prediction" / "stale budget" / "stale plan" rather than a silent decision on old data — the case that matters is a stage having failed on the previous tick. `--force` overrides it.
 - **The supervisor executes a fixed plan.** `aqm execute` reads its plan once and works to it: the mandate cannot move under a running supervisor. The room left for the user was computed at plan time, at most one tick earlier, and is not re-checked during the run (`../06_execution/DESIGN.md` §5).
 
 Stage 6 is a **detached supervisor**, one process covering both agents. Stages 1, 2, 3 and 5 are read-only and safe to run by hand at any time; 4 and 6 carry their own guards (§2), so running them by hand is exactly as safe as letting the scheduler do it, and `aqm pipeline` adds only ordering and the lock.
@@ -48,18 +48,18 @@ Every command prints a short human-readable summary of what it did or decided, a
 
 **Global options:** `--json`, `--dry-run`, `--verbose`. **Exit codes:** `0` success, `1` error, `2` refused by a guard, `3` locked.
 
-`--ignore-prediction` is refused unless `--dry-run` is given; it exists because running the pipeline by hand is itself organic activity, which leaves no room.
+`--ignore-prediction` is refused unless `--dry-run` is given; it exists because running the pipeline by hand is itself human activity, which leaves no room.
 
 **`--at <iso>` is the backtest knob.** `predict` and `budget` recompute as of a past moment, reading only data that existed then (the state files keep the full history). **`--at` never writes to live state:** the stage prints its output and writes a file only when `--out` is given, so a backtest can never add artifacts to the live tree or move a `latest` symlink. A backtest is a loop over timestamps chaining the read-only stages as shown in §1.1, with its artifacts written under `/tmp` — no separate replay command, and the loop lives in the notebook where its output is analysed.
 
-### 1.3 Files touched
+### 1.3 Files read and written
 
 | Direction | Path                                                     | Purpose                                                               |
 | --------- | -------------------------------------------------------- | --------------------------------------------------------------------- |
 | Reads     | `~/opt/agent-usage-tracker/data/claude/account.jsonl`    | Claude meter                                                          |
 | Reads     | `~/opt/agent-usage-tracker/data/codex/account.jsonl`     | Codex meter                                                           |
-| Reads     | `~/opt/agent-usage-tracker/data/claude/<session-id>.jsonl` | Per-request and per-session dollars, for attribution only — read only when a bucket overlaps one of our runs (`../01_ingestion/DESIGN.md` §3) |
-| Stats     | `~/.claude/projects/*/*.jsonl`, `~/.codex/sessions/**/*.jsonl` | **mtime only, contents never read** — the liveness tripwire (`../01_ingestion/DESIGN.md` §3) |
+| Reads     | `~/opt/agent-usage-tracker/data/claude/<session-id>.jsonl` | Per-request and per-session dollars, for attribution only — read only when a slot overlaps one of our runs (`../01_ingestion/DESIGN.md` §3) |
+| Reads     | `~/.codex/sessions/**/*.jsonl`                           | Codex liveness only: `stat` to nominate candidates, then a few-KB tail of the ones that moved (`../01_ingestion/DESIGN.md` §3.1). Claude transcripts are not read or stated |
 | Writes    | `~/opt/agent-quota-maximizer/state/`                     | Ingested history, latest symlinks, sessions, runs, locks (§5)         |
 | Writes    | `~/opt/agent-quota-maximizer/artifacts/`                 | Timestamped prediction, budget and plan artifacts (§5)                |
 | Writes    | `~/opt/agent-quota-maximizer/reports/`                   | Task reports and their index (`../05_planning/DESIGN.md` §5)          |
@@ -77,8 +77,12 @@ aqm pipeline:
   if not config.enabled:                              exit "disabled"
   if the pipeline lock is held:                       exit "busy"
   ingest(); predict(); budget()                       # stages 1-3, read-only
-  if freshest reading older than READING_MAX_AGE:     exit "stale"    # the meter may have moved
   housekeeping()                                      # log rotation, daily counter, artifact and report pruning
+  per agent with extra_quota_to_spend_units > 0:                      # the guard is per agent, not global
+      if its reading is older than READING_MAX_AGE_SECONDS:   drop it, decision "stale"
+      # an agent with NO reading at all is not stale: budgeting already answers
+      # that one with `no meter reading`, and one missing agent must not stop the
+      # other's tick
   start_windows()                                     # stage 4, its own guards
   plan()                                              # stage 5: amount, deadline, start_after, queue
   if no agent has amount ≥ MIN_TASK_BUDGET:           exit "nothing due"
@@ -99,11 +103,11 @@ One supervisor covers both agents, since the plan carries both mandates and thei
 
 | Risk                                          | Mitigation                                                                                                               |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Runaway spending                              | `amount` per chunk and per agent, `MAX_DAILY_UNITS` per day, `MIN_TASK_BUDGET` at the tail end                           |
+| Runaway spending                              | `amount` per window and per agent, `MAX_DAILY_UNITS` per day, `MIN_TASK_BUDGET` at the tail end                           |
 | Overshoot multiplied by parallelism           | Reservation before launch (`../06_execution/DESIGN.md` §3)                                                               |
 | Two tasks in one repo                         | Repo lock across agents (`../06_execution/DESIGN.md` §2)                                                                 |
 | Machine overloaded                            | `MAX_PARALLEL_TOTAL` slot semaphore (§4)                                                                                 |
-| Blocking the user                             | Late start, the room test at plan time, `GUARD_PCT` during the run, `MIN_MARGIN` never filled                            |
+| Blocking the user                             | Late start, the room test at plan time, `GUARD_PCT` during the run, `MIN_HUMAN_RESERVE_PCT` never filled                            |
 | Writing to a repo                             | Read-only flags and sandbox (`../06_execution/DESIGN.md` §2); reports written outside repos                              |
 | Secrets in reports                            | Excluded repos in config, prompt instruction, scrubber (`../05_planning/DESIGN.md` §5)                                   |
 | Bad config                                    | Invalid or unreadable config is a hard stop: nothing runs                                                                |
@@ -124,9 +128,9 @@ One supervisor covers both agents, since the plan carries both mandates and thei
 
 The plist follows the conventions of `agent-usage-tracker` (formerly `agent-statusline`) **[verified from its plist]**: `ProcessType Background`, `StandardOutPath`/`StandardErrorPath` into the project's own `logs/`, the real file in `~/opt/agent-quota-maximizer/`, a symlink in `~/Library/LaunchAgents/`.
 
-**Why 5 minutes.** The decision is cheap, the meter has 1% resolution, and a tick arriving 5 minutes late costs at most 5 minutes of a chunk's tail. Shorter would add nothing; longer would blunt the late start of `../05_planning/DESIGN.md` §1.
+**Why 5 minutes.** The decision is cheap, the meter has 1% resolution, and a tick arriving 5 minutes late costs at most 5 minutes of a window's tail. Shorter would add nothing; longer would blunt the late start of `../05_planning/DESIGN.md` §1.
 
-**What a tick is allowed to cost.** Stages 1–3 run on every one of the 288 ticks a day, whether or not anything is due, so the whole read-only chain is budgeted at **about one second of wall clock, no network calls and no subprocesses** — ingestion dominates it and is itself held under a second (`../01_ingestion/DESIGN.md` §7, `../02_prediction/DESIGN.md` §7, `../03_budgeting/DESIGN.md` §6). On the great majority of ticks `amount_due` is 0 and the tick ends right there, so that second is the entire cost of running this system.
+**What a tick is allowed to cost.** Stages 1–3 run on every one of the 288 ticks a day, whether or not anything is due, so the whole read-only chain is budgeted at **about one second of wall clock, no network calls and no subprocesses** — ingestion dominates it and is itself held under a second (`../01_ingestion/DESIGN.md` §7, `../02_prediction/DESIGN.md` §7, `../03_budgeting/DESIGN.md` §6). On the great majority of ticks `extra_quota_to_spend_units` is 0 and the tick ends right there, so that second is the entire cost of running this system.
 
 That budget is a design constraint, not an aspiration: a system whose job is to avoid being in the user's way cannot itself be a background process that wakes up every 5 minutes and does real work. The pipeline lock turns any breach into a skipped tick rather than a pile-up (§2), and a tick's duration is recorded in `logs/metrics.jsonl` so a regression is visible in the notebook (§8).
 
@@ -145,12 +149,14 @@ That budget is a design constraint, not an aspiration: a system whose job is to 
 
 Three kinds of file, with three different lifetimes.
 
-**1. Ingested history — append-only JSONL, disposable and rebuildable (`../01_ingestion/DESIGN.md` §7).**
+**1. Ingested history — append-only CSV, disposable and rebuildable (`../01_ingestion/DESIGN.md` §7).**
 
 | File | Content |
 |---|---|
-| `state/meter-<agent>.jsonl` | Envelope-filtered meter readings, ~30 rows/day/agent — the audit trail (`../01_ingestion/DESIGN.md` §6.1) |
-| `state/buckets.jsonl` | The tidy 5-minute table every later stage reads (`../01_ingestion/DESIGN.md` §6.2) |
+| `data/<agent>/meter.csv` | Envelope-filtered meter readings, 23/day for Claude and 5 for Codex — the audit trail (`../01_ingestion/DESIGN.md` §6.1) |
+| `data/<agent>/slots.csv` | The tidy 5-minute table every later stage reads (`../01_ingestion/DESIGN.md` §6.2) |
+
+`data/` is history and is rebuildable; `state/` below is not. Keeping them apart is what makes "delete `data/` and re-run `--backfill`" a safe instruction (`../01_ingestion/DESIGN.md` §6.0).
 
 **2. Artifacts — immutable, one per stage per tick, never overwritten.**
 
@@ -161,7 +167,7 @@ artifacts/plans/2026-09-23/143607.json
 state/latest/prediction.json                     symlink → the newest artifact of that kind
 ```
 
-Each file is named after its `computed_at` and carries `computed_at`, `method` and a `config_hash`, so a past decision can be read back exactly as it was taken — a config edit is the one thing that would otherwise make it unexplainable. Date-sharded directories mean pruning is a directory unlink and no listing grows without bound; the `latest/` symlinks, swapped atomically after each write, make the default input O(1) with no globbing.
+Each file is named after its `computed_ts` and carries `computed_ts`, `method` and a `config_hash`, so a past decision can be read back exactly as it was taken — a config edit is the one thing that would otherwise make it unexplainable. Date-sharded directories mean pruning is a directory unlink and no listing grows without bound; the `latest/` symlinks, swapped atomically after each write, make the default input O(1) with no globbing.
 
 Disk: about 9 KB per tick across both agents ≈ **2.5 MB a day**, pruned at `ARTIFACT_RETENTION_DAYS` during housekeeping, so roughly 35 MB in steady state.
 
@@ -196,7 +202,7 @@ Every write is atomic (`.tmp` + `os.replace`, then the symlink swap), so a crash
   "excluded_repos": ["~/dev/repo-with-secrets"],
   "categories": {"bugs": 1.0, "agent-docs": 0.5, "tests": 0.5},
   "models": {"cheap": "haiku", "default": "sonnet", "expensive": "opus"},
-  "parameters": {"MIN_MARGIN": 0.1, "RATE_WINDOW": 30, "QUIET_HOURS": [0, 9]}
+  "parameters": {"MIN_HUMAN_RESERVE_PCT": 0.1, "BURN_LOOKBACK_MINUTES": 30, "QUIET_HOURS": [0, 9]}
 }
 ```
 
@@ -214,22 +220,22 @@ Everything the system decides is logged; the analysis happens in a notebook agai
 
 | File                   | One line per                              | Fields                                                                                                |
 | ---------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `logs/metrics.jsonl`   | Tick, per agent                           | Timestamp, meter percentages, window state, `amount_due`, predicted p95, room, decision, reason       |
+| `logs/metrics.jsonl`   | Tick, per agent                           | Timestamp, meter percentages, window state, `extra_quota_to_spend_units`, predicted p95, room, decision, reason       |
 | `state/runs.jsonl`     | Finished task                             | Session id, repo, category, model, effort, cost, duration, timeout/error flags, scrubbed-secret count |
 | `state/burnrate.jsonl` | Finished task                             | Units per hour per worker and aggregate, model, effort, workers running at the time                   |
-| `state/buckets.jsonl`  | Agent × 5-minute bucket                   | Organic and extra movement, window state, censoring flags (`../01_ingestion/DESIGN.md` §6.2)          |
+| `data/<agent>/slots.csv`  | Agent × 5-minute slot                   | Organic and extra movement, window state, censoring flags (`../01_ingestion/DESIGN.md` §6.2)          |
 
 Together they answer the questions worth asking, with the definitions a notebook needs:
 
 | Question               | How it is computed                                                                                                                                |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Waste                  | Weekly meter percent left at the last reading before each reset, in units                                                                         |
-| Extra spend            | Sum of `extra_pct` in `state/buckets.jsonl` over the week                                                                                                   |
+| Extra spend            | Sum of `slot_window_bot_pct` in `data/<agent>/slots.csv` over the week                                                                                                   |
 | **Blocking incidents** | Organic activity meeting a saturated 5-hour window within `BLOCKING_WINDOW` of extra work running in that window — **the number that must stay at zero** |
 | Near misses            | Runs where the user became active while workers were still running — the metric that decides whether the live room re-check is worth building (`../06_execution/DESIGN.md` §5) |
-| Forecast calibration   | Share of windows where actual organic demand exceeded the predicted p95; should be ≤ 5%                                                           |
+| Forecast calibration   | Share of windows where actual human demand exceeded the predicted p95; should be ≤ 5%                                                           |
 | Burn rate              | Median units per hour, per model, per worker and aggregate                                                                                        |
-| Unreachable quota      | `unreachable` from the last tick before each reset                                                                                                |
+| Unreachable quota      | `already_lost_units` from the last tick before each reset                                                                                                |
 
 ## 9. Testing
 
@@ -241,7 +247,13 @@ Each stage owns its own tests (see its DESIGN.md). Across stages:
 
 ## 10. Deployment
 
-`install.sh`, at the top of `release/` in the source repo: copy `aqm/` and the plist into `~/opt/agent-quota-maximizer/`, create `state/`, `logs/`, `reports/`, write `config.json` from the template if none exists (with every `~/dev` repo listed and `enabled: false`), symlink the plist into `~/Library/LaunchAgents/`, symlink `~/.local/bin/aqm`, then `launchctl bootout` + `bootstrap`. Idempotent, and it never overwrites an existing `config.json` or anything in `state/`.
+Status: **the LaunchAgent, `install.sh`, `uninstall.sh`, the plist and the config template are built; stages 4 and 6 are not, so a tick ends at `budget` and nothing can act.**
+
+`release/install.sh` **[built 2026-10-04]**: copy `aqm.py` and the plist into `~/opt/agent-quota-maximizer/`, create `logs/`, `state/locks/`, `state/latest/`, `artifacts/` and `reports/`, write `config.json` from `config.json.template` if none exists (`enabled: false`, empty repo list), symlink the plist into `~/Library/LaunchAgents/` and `aqm` into `~/.local/bin/`, then `launchctl bootout` + `bootstrap`, and finally run one tick to prove the deployed copy works. Idempotent, and it never overwrites an existing `config.json` or anything in `data/`, `state/`, `logs/` or `reports/`.
+
+**Both symlinks are symlinks, and the real files live in `~/opt/`** — the scheduler directory and `~/.local/bin` never hold a real file for a project deployed this way (`~/AGENTS.md`). `aqm.py` carries a `#!/usr/bin/python3` shebang rather than `env python3`, for the same reason the plist names the interpreter in full: the job must not break when a Conda environment moves, and the `~/.local/bin/aqm` symlink would otherwise inherit whatever `python3` happened to be first on `PATH`.
+
+**A fresh install is inert.** The template sets `enabled: false`, so the scheduled job exits at the first guard until the repo list is filled in and the flag flipped. Stages 4 and 6 do not exist yet either, so even enabled it can only ingest, predict and budget.
 
 `uninstall.sh` unloads the job and removes both symlinks, leaving state and reports in place.
 
@@ -253,18 +265,19 @@ Development happens only in `~/dev/agent-quota-maximizer/release/` (`~/AGENTS.md
 
 | Parameter                              | Meaning                                                                                                               | Value             |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| `MIN_MARGIN`                           | Room never filled in any window: the stand-in for a forecast where none exists yet                                    | 0.1 unit          |
-| `PERSISTENCE_HOURS`, `PERSISTENCE_P95` | How long the current organic rate is assumed to persist, and the p95 multiplier on it                                 | 2 h, 1.5          |
-| `WINDOW_GAP`                           | Assumed gap between consecutive windows                                                                               | 5 min             |
-| `DEADLINE_MARGIN`                      | Safety before a chunk's end                                                                                           | 5 min             |
-| `RATE_WINDOW`                          | Span over which the organic spend rate is measured                                                                    | 30 min            |
-| `TRIPWIRE_RATE`                        | Rate assumed when S2 or S3 fire before spend can be priced                                                            | $0.05/min         |
-| `READING_MAX_AGE`                      | Freshness required of a meter reading                                                                                 | 10 min            |
-| `MAX_INPUT_AGE`                        | Freshness required of an input artifact, i.e. two ticks (§1.1)                                                        | 10 min            |
-| `READ_TAIL_KB`                         | Tail read when a cursor is lost                                                                                       | 256 KB            |
+| `MIN_HUMAN_RESERVE_PCT`                | Share of a window never offered to the bot. **In percent**, so it compares directly against `predicted_p95_human_usage_pct` and against `GUARD_PCT`. **Measured, not chosen** (`../02_prediction/DESIGN.md` §8): the forecast is exactly 0 on 73.6% of ticks, and on those the human's demand to the window's end has a 90.9th percentile of 26% | 25 %              |
+| `SAFETY_MULTIPLIER` | The quantile multiplier turning the measured human rate into a p95. There is no horizon parameter: the forecast always runs to the window's end (`../02_prediction/DESIGN.md` §1.1). **Measured**: 2, 3 and 5 all cost more (§8 there) | 1.5 |
+| `WINDOW_GAP_SECONDS`                           | Assumed gap between consecutive windows                                                                               | 5 min             |
+| `DEADLINE_MARGIN_SECONDS`                      | Safety before a window's end                                                                                           | 5 min             |
+| `BURN_LOOKBACK_MINUTES`                | Span over which the recent human burn rate is measured                                                                | 30 min            |
+| `MIN_RATE_DENOMINATOR_MINUTES`         | Floor on the divisor of the *window-average* burn rate. Flooring it at `BURN_LOOKBACK_MINUTES` instead halved the measured pace of any window younger than 30 minutes, which understates the reserve — the dangerous direction (`../02_prediction/DESIGN.md` §2) | 10 min            |
+| `ACTIVE_HUMAN_BURN_RATE`               | Floor on the human rate when the active-human floor fires before the meter has moved. **In percent of a 5-hour window per minute**, because that is the unit a limit is enforced in (`../CONSIDERATIONS.md` §5); the intent was $0.05/min, which at $32 a unit is 0.156 | 0.15 %/min        |
+| `READING_MAX_AGE_SECONDS`                      | Freshness required of a meter reading                                                                                 | 10 min            |
+| `ARTIFACT_MAX_AGE_SECONDS`                        | Freshness required of an input artifact, i.e. two ticks (§1.1)                                                        | 10 min            |
+| `READ_TAIL_KB`                         | Starting tail read, doubled until it reaches past the watermark (`../01_ingestion/DESIGN.md` §4)                      | 64 KB             |
 | `ROLLUP_BUCKET`                        | Rollup granularity                                                                                                    | 5 min             |
 | `QUIET_HOURS`                          | Hours using the gentle profile                                                                                        | 00:00–09:00 local |
-| `GENTLE_RATE`, `BURST_RATE`            | Intended burn rate per profile                                                                                        | 0.2, 1.0 unit/h   |
+| `GENTLE_RATE`, `BOT_BURN_UNITS_PER_HOUR`            | Intended burn rate per profile. **`BOT_BURN_UNITS_PER_HOUR` also caps a window's ceiling** (`../03_budgeting/DESIGN.md` §2), so it is load-bearing in two stages and is still an assumption | 0.2, 1.0 unit/h   |
 | `SAFETY`                               | Lead-time multiplier                                                                                                  | 1.5               |
 | `ESCALATE_RATE`                        | Required rate above which models and workers escalate                                                                 | 0.5 unit/h        |
 | `WINDOW_OPEN_COOLDOWN`                 | Between two opening attempts                                                                                          | 15 min            |
@@ -276,7 +289,7 @@ Development happens only in `~/dev/agent-quota-maximizer/release/` (`~/AGENTS.md
 | `GRACE`                                | Time given to workers after the deadline                                                                              | 2 min             |
 | `METER_POLL`                           | Meter re-read interval in a supervisor                                                                                | 60 s              |
 | `TASK_TIMEOUT`                         | Wall clock per task                                                                                                   | 20 min            |
-| `TICK_INTERVAL`                        | Scheduler period                                                                                                      | 5 min             |
+| `TICK_INTERVAL_SECONDS`                        | Scheduler period                                                                                                      | 5 min             |
 | `MIN_BURN_SAMPLES`                     | Samples before trusting the measured rate                                                                             | 10                |
 | `BLOCKING_WINDOW`                      | Window for counting a blocking incident                                                                               | 30 min            |
 | `ARTIFACT_RETENTION_DAYS`              | Prediction, budget and plan artifacts older than this are pruned                                                      | 14                |

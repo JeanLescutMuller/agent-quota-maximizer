@@ -71,7 +71,7 @@ The gap did not waste 3 hours of capacity, it removed a whole window's worth of 
 ### 3.5 Practical risks
 
 - **The machine may be asleep** at the moment a window should be opened (`../CONSIDERATIONS.md` §16), so a missed firing must be detected and recovered rather than assumed impossible.
-- **The opening message is usage too.** It appears in the history and must be tagged, or it will be learned as organic user activity (§7.8).
+- **The opening message is usage too.** It appears in the history and must be tagged, or it will be learned as human user activity (§7.8).
 - **Unknown:** whether a trivial message (a one-token prompt) reliably opens a window on each agent, and what the cheapest such message is.
 - **Unknown:** how precisely the expiry timestamp can be trusted (clock drift, stale readings, integer percentages).
 - **Unknown:** Codex's unattended launch path (`../CONSIDERATIONS.md` §15).

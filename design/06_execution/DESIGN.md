@@ -92,9 +92,9 @@ What bounds the damage meanwhile:
 
 | Bound | Effect |
 |---|---|
-| `MIN_MARGIN` is never filled | Whatever happens, a slice of the window is left for the user |
+| `MIN_HUMAN_RESERVE_PCT` is never filled | Whatever happens, a slice of the window is left for the user |
 | `GUARD_PCT` on the meter | The one live check: when the window is nearly full, launching stops and the newest workers are killed |
-| `deadline` | The run cannot outlive the chunk it was planned for |
+| `spend_by_ts` | The run cannot outlive the window it was planned for |
 | Late start | During the user's hours work begins as late as the burn rate allows, so the exposure window is short by construction (`../05_planning/DESIGN.md` §1) |
 | `TASK_TIMEOUT` | No single worker runs longer than 20 minutes |
 

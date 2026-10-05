@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Source of the published page https://claude.ai/artifact/HDpL1mBZpNjAyefG4ZX2Dd . Names follow design/VOCABULARY.md. Open locally: open design/PIPELINE_MAP.html -->
+<title>Quota Maximizer Pipeline Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column, a sticky stage strip, each stage = question + needs/gives + one diagram */
+:root {
+  --bg: #f2f4f6; --surface: #ffffff; --fg: #15202b; --muted: #5b6875; --line: #d3dae1; --soft: #e7ecf0;
+  --human: #2f6db0; --human-soft: #c9dcf1; --bot: #c27c0e; --bot-soft: #f5dfb8; --lost: #b4423a; --lost-soft: #f2d0cc;
+  --ok: #2d7f52;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151b; --surface: #17202a; --fg: #e5eaef; --muted: #94a1ae; --line: #2b3743; --soft: #1e2934;
+  --human: #6aa8e8; --human-soft: #1f3a57; --bot: #eeab45; --bot-soft: #4a3713; --lost: #e7766b; --lost-soft: #4d2522;
+  --ok: #5dc28a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #17202a; --fg: #e5eaef; --muted: #94a1ae; --line: #2b3743; --soft: #1e2934;
+  --human: #6aa8e8; --human-soft: #1f3a57; --bot: #eeab45; --bot-soft: #4a3713; --lost: #e7766b; --lost-soft: #4d2522;
+  --ok: #5dc28a; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 80px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15 }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; letter-spacing: -0.01em }
+h2 { font-size: 24px; font-weight: 700 }
+h3 { font-size: 16px; font-weight: 700 }
+p { margin: 0; max-width: 68ch }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em }
+code { background: var(--soft); padding: 1px 5px; border-radius: 4px; white-space: nowrap }
+.muted { color: var(--muted) }
+.eyebrow { font: 600 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
+.stack { display: flex; flex-direction: column; gap: 14px }
+section { display: flex; flex-direction: column; gap: 16px; padding-block: 34px; border-top: 1px solid var(--line) }
+section > * { min-width: 0 }
+
+/* sticky stage strip */
+nav.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  border-bottom: 1px solid var(--line); margin-inline: -16px; padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto }
+nav.strip a { flex: none; font: 600 12px/1 var(--f-mono); color: var(--fg); text-decoration: none; padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface) }
+nav.strip a:hover, nav.strip a:focus-visible { border-color: var(--fg); outline: none }
+nav.strip a.todo { border-style: dashed; color: var(--muted) }
+
+/* figures */
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+figure .scroll { overflow-x: auto }
+figure svg { display: block; width: 100%; height: auto; color: var(--fg) }
+figure svg.wide { min-width: 720px }
+figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); max-width: 80ch }
+svg text { font-family: var(--f-body); font-size: 12px; fill: currentColor }
+svg .mono { font-family: var(--f-mono); font-size: 11px }
+svg .small { font-size: 10.5px }
+svg .bold { font-weight: 600 }
+svg .t-muted { fill: var(--muted) }
+svg .t-human { fill: var(--human) } svg .t-bot { fill: var(--bot) } svg .t-lost { fill: var(--lost) } svg .t-ok { fill: var(--ok) }
+svg .s-line { stroke: currentColor; fill: none } svg .s-muted { stroke: var(--muted); fill: none }
+svg .s-grid { stroke: var(--line); fill: none }
+svg .s-human { stroke: var(--human); fill: none } svg .s-bot { stroke: var(--bot); fill: none } svg .s-lost { stroke: var(--lost); fill: none }
+svg .f-human { fill: var(--human) } svg .f-human-soft { fill: var(--human-soft) }
+svg .f-bot { fill: var(--bot) } svg .f-bot-soft { fill: var(--bot-soft) }
+svg .f-lost { fill: var(--lost) } svg .f-lost-soft { fill: var(--lost-soft) }
+svg .f-surface { fill: var(--surface) } svg .f-soft { fill: var(--soft) } svg .f-fg { fill: currentColor } svg .f-muted { fill: var(--muted) }
+svg .box { fill: var(--surface); stroke: currentColor; stroke-width: 1.4 }
+svg .box-todo { fill: var(--surface); stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 5 4 }
+svg .dash { stroke-dasharray: 5 4 }
+
+/* tables */
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px }
+table { border-collapse: collapse; width: 100%; font-size: 14px }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top }
+tr:last-child td { border-bottom: 0 }
+th { font: 600 11px/1.3 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--soft) }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-space: nowrap }
+
+/* stage header */
+.stage-head { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline }
+.stage-no { font: 800 34px/1 var(--f-display); color: var(--muted) }
+.badge { display: inline-block; font: 600 10.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 4px; vertical-align: 3px; margin-left: 8px }
+.badge.built { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok) }
+.badge.todo { border: 1px dashed var(--muted); color: var(--muted) }
+.q { font: 600 18px/1.35 var(--f-display); }
+.io { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.io > div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0 }
+.io ul { margin: 6px 0 0; padding-left: 18px } .io li { margin: 3px 0 }
+@media (max-width: 640px) { .io { grid-template-columns: 1fr } }
+
+/* needs chain */
+.chain { display: flex; flex-direction: column; gap: 0 }
+.link { display: grid; grid-template-columns: 150px 1fr; gap: 14px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px }
+.link > * { min-width: 0 }
+.link .who { font: 700 15px/1.2 var(--f-display) }
+.link .who small { display: block; font: 400 12px/1.3 var(--f-mono); color: var(--muted); margin-top: 3px }
+.link .needs { font-size: 14px }
+.link .why { font-size: 13.5px; color: var(--muted); margin-top: 4px }
+.arrow-row { text-align: left; padding-left: 64px; color: var(--muted); font: 600 12px/1 var(--f-mono); padding-block: 6px }
+@media (max-width: 560px) { .link { grid-template-columns: 1fr; gap: 6px } .arrow-row { padding-left: 16px } }
+
+/* vocabulary strip */
+.vocab { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px }
+.vocab div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13.5px }
+.vocab b { font-family: var(--f-mono); font-size: 13px }
+.key { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; margin-right: 5px }
+.key.h { background: var(--human) } .key.b { background: var(--bot) } .key.l { background: var(--lost) }
+
+/* interactive */
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px }
+.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; min-width: 0 }
+.controls output { font: 600 14px var(--f-mono) }
+.controls input[type=range] { width: 100%; accent-color: var(--bot) }
+@media (max-width: 560px) { .controls { grid-template-columns: 1fr } }
+.readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px }
+.readout div { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0 }
+.readout .v { font: 700 20px/1.2 var(--f-display); font-variant-numeric: tabular-nums }
+.readout .n { font: 400 11.5px/1.3 var(--f-mono); color: var(--muted); overflow-wrap: anywhere }
+@media (max-width: 560px) { .readout { grid-template-columns: 1fr } }
+
+.note { border-left: 3px solid var(--lost); padding: 8px 12px; background: var(--surface); border-radius: 0 6px 6px 0; font-size: 14px }
+.formula { font: 14px/1.7 var(--f-mono); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre }
+@media (prefers-reduced-motion: no-preference) { #bf-svg rect { transition: height .15s, y .15s } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="stack" style="padding-bottom:22px">
+  <div class="eyebrow">agent-quota-maximizer · design map · names from design/VOCABULARY.md</div>
+  <h1>Spend the quota that would expire, as late as possible</h1>
+  <p>Every 5 minutes one tick runs six stages. Five of them only compute; two of them act. This page shows what each stage answers, what it needs from the stage before, and why.</p>
+</header>
+
+<nav class="strip" aria-label="Stages">
+  <a href="#map">Map</a><a href="#why">Why each needs the last</a>
+  <a href="#budget">3 · Budget</a><a href="#predict">2 · Predict</a><a href="#ingest">1 · Ingest</a>
+  <a href="#start" class="todo">4 · Start windows</a><a href="#plan" class="todo">5 · Plan</a><a href="#execute" class="todo">6 · Execute</a>
+  <a href="#gaps">Known gaps</a>
+</nav>
+
+<!-- ============ THE PROBLEM ============ -->
+<section style="border-top:0">
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 190" role="img" aria-label="A Claude week: about half the weekly meter is used by the user and the rest expires at the reset; the goal is for bot work to fill that part just before the reset.">
+      <text x="0" y="16" class="eyebrow bold">The weekly meter of one Claude week (8.85 units ≈ $283)</text>
+      <!-- row 1 -->
+      <text x="0" y="58" class="bold">Today</text>
+      <rect x="110" y="40" width="390" height="28" class="f-human"/>
+      <rect x="500" y="40" width="380" height="28" class="f-lost-soft"/>
+      <rect x="500" y="40" width="380" height="28" class="s-lost dash"/>
+      <text x="305" y="58" text-anchor="middle" class="f-surface bold" style="fill:var(--surface)">human work</text>
+      <text x="690" y="58" text-anchor="middle" class="t-lost bold">unspent at the reset ≈ $139 / week</text>
+      <!-- row 2 -->
+      <text x="0" y="118" class="bold">Goal</text>
+      <rect x="110" y="100" width="390" height="28" class="f-human"/>
+      <rect x="500" y="100" width="250" height="28" class="f-bot"/>
+      <rect x="750" y="100" width="130" height="28" class="f-lost-soft"/>
+      <text x="305" y="118" text-anchor="middle" class="bold" style="fill:var(--surface)">human work</text>
+      <text x="625" y="118" text-anchor="middle" class="bold" style="fill:var(--surface)">bot work, spent late</text>
+      <text x="815" y="118" text-anchor="middle" class="t-lost small">already_lost_units</text>
+      <!-- axis -->
+      <line x1="110" y1="146" x2="880" y2="146" class="s-muted"/>
+      <text x="110" y="164" class="mono t-muted">0%</text>
+      <text x="880" y="164" text-anchor="end" class="mono t-muted">100% week_used_pct</text>
+      <line x1="880" y1="30" x2="880" y2="150" class="s-line"/>
+      <text x="876" y="184" text-anchor="end" class="small t-muted">week_end_ts: the weekly meter resets, the rest is gone</text>
+    </svg>
+    </div>
+    <figcaption>Measured over a month: Claude leaves about $139 of each week unspent, Codex about $98. Some of it cannot be placed in any remaining window: that part is <code>already_lost_units</code>, the number this project exists to shrink.</figcaption>
+  </figure>
+
+  <h3>The words used on this page</h3>
+  <div class="vocab">
+    <div><b>slot</b> — 5 minutes. Always present, even when nothing runs.</div>
+    <div><b>window</b> — the 5-hour meter. Runs only once a message opens it.</div>
+    <div><b>week</b> — the 7-day meter. Resets at <code>week_end_ts</code>.</div>
+    <div><b>unit</b> — one whole window = 100% of the 5-hour meter ≈ $32 Claude / $20.5 Codex.</div>
+    <div><span class="key h"></span><b>human</b> — the user's own interactive work.</div>
+    <div><span class="key b"></span><b>bot</b> — this project's background work.</div>
+    <div><b>_pct</b> — percent of the meter named (<code>window_</code> or <code>week_</code>).</div>
+    <div><b>predicted_</b> — the only prefix for a number about the future.</div>
+  </div>
+</section>
+
+<!-- ============ MAP ============ -->
+<section id="map">
+  <div class="eyebrow">The pipeline</div>
+  <h2>Six stages, one tick every 5 minutes</h2>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 1060 360" role="img" aria-label="Pipeline map: the account meter feeds ingest, predict, budget, plan and execute in a row. Start windows reads the meter and opens windows. Execute spends on the meter and records its run intervals, which ingest reads back to tell human from bot.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-fg"/></marker>
+        <marker id="m-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-bot"/></marker>
+      </defs>
+      <!-- meter -->
+      <rect x="10" y="40" width="130" height="120" rx="6" class="f-soft"/>
+      <rect x="10" y="40" width="130" height="120" rx="6" class="s-line"/>
+      <text x="75" y="66" text-anchor="middle" class="bold">Account meter</text>
+      <text x="75" y="86" text-anchor="middle" class="small t-muted">Claude / Codex</text>
+      <text x="75" y="110" text-anchor="middle" class="mono">window_used_pct</text>
+      <text x="75" y="126" text-anchor="middle" class="mono">week_used_pct</text>
+      <text x="75" y="148" text-anchor="middle" class="small t-muted">one gauge, no "who"</text>
+
+      <!-- stage boxes: x = 190, 365, 540, 715, 890 ; w = 150 -->
+      <g>
+        <rect x="190" y="40" width="150" height="120" rx="6" class="box"/>
+        <text x="202" y="62" class="bold">1 · Ingest</text>
+        <text x="202" y="80" class="mono t-muted">aqm ingest</text>
+        <text x="202" y="104">What happened?</text>
+        <text x="202" y="148" class="mono small">→ slots.csv</text>
+      </g>
+      <g>
+        <rect x="365" y="40" width="150" height="120" rx="6" class="box"/>
+        <text x="377" y="62" class="bold">2 · Predict</text>
+        <text x="377" y="80" class="mono t-muted">aqm predict</text>
+        <text x="377" y="104">How much will the</text>
+        <text x="377" y="120">user still burn?</text>
+        <text x="377" y="148" class="mono small">→ prediction.json</text>
+      </g>
+      <g>
+        <rect x="540" y="40" width="150" height="120" rx="6" class="box" style="stroke-width:2.6"/>
+        <text x="552" y="62" class="bold">3 · Budget</text>
+        <text x="552" y="80" class="mono t-muted">aqm budget</text>
+        <text x="552" y="104">How much may the</text>
+        <text x="552" y="120">bot spend, by when?</text>
+        <text x="552" y="148" class="mono small">→ budget.json</text>
+      </g>
+      <g>
+        <rect x="715" y="40" width="150" height="120" rx="6" class="box-todo"/>
+        <text x="727" y="62" class="bold">5 · Plan</text>
+        <text x="727" y="80" class="mono t-muted">aqm plan</text>
+        <text x="727" y="104">From when, what,</text>
+        <text x="727" y="120">where, which model?</text>
+        <text x="727" y="148" class="mono small">→ plan.json</text>
+      </g>
+      <g>
+        <rect x="890" y="40" width="150" height="120" rx="6" class="box-todo"/>
+        <text x="902" y="62" class="bold">6 · Execute</text>
+        <text x="902" y="80" class="mono t-muted">aqm execute</text>
+        <text x="902" y="104">Run read-only</text>
+        <text x="902" y="120">tasks on repos</text>
+        <text x="902" y="148" class="mono small t-bot">ACTS: spends units</text>
+      </g>
+      <!-- arrows along the row -->
+      <line x1="140" y1="100" x2="188" y2="100" class="s-line" marker-end="url(#m-a)"/>
+      <line x1="340" y1="100" x2="363" y2="100" class="s-line" marker-end="url(#m-a)"/>
+      <line x1="515" y1="100" x2="538" y2="100" class="s-line" marker-end="url(#m-a)"/>
+      <line x1="690" y1="100" x2="713" y2="100" class="s-line" marker-end="url(#m-a)"/>
+      <line x1="865" y1="100" x2="888" y2="100" class="s-line" marker-end="url(#m-a)"/>
+      <text x="164" y="92" text-anchor="middle" class="small t-muted">reads</text>
+      <!-- slots also go to budget (week level) -->
+      <path d="M265,40 L265,22 L615,22 L615,38" class="s-muted dash" marker-end="url(#m-a)"/>
+      <text x="440" y="16" text-anchor="middle" class="small t-muted">budget also reads week_used_pct, week_end_ts from slots.csv</text>
+
+      <!-- start windows -->
+      <rect x="540" y="200" width="150" height="76" rx="6" class="box-todo"/>
+      <text x="552" y="222" class="bold">4 · Start windows</text>
+      <text x="552" y="240" class="mono t-muted small">aqm start_windows</text>
+      <text x="552" y="262" class="mono small t-bot">ACTS: "ok" ≈ $0.02</text>
+      <path d="M265,160 L265,238 L538,238" class="s-muted" marker-end="url(#m-a)"/>
+      <text x="400" y="230" text-anchor="middle" class="mono small t-muted">is_window_open?</text>
+
+      <!-- bot spend lane back to meter -->
+      <path d="M965,160 L965,310 L75,310 L75,162" class="s-bot" style="stroke-width:1.6" marker-end="url(#m-b)"/>
+      <path d="M615,276 L615,308" class="s-bot" style="stroke-width:1.6"/>
+      <text x="790" y="302" text-anchor="middle" class="small t-bot bold">bot work moves the meter</text>
+      <text x="470" y="302" text-anchor="middle" class="small t-bot">opens a window</text>
+      <!-- run intervals back to ingest -->
+      <path d="M1000,160 L1000,340 L300,340 L300,162" class="s-muted dash" marker-end="url(#m-a)"/>
+      <text x="650" y="334" text-anchor="middle" class="small t-muted">bot run intervals (state/runs.jsonl): lets ingest tell human movement from bot movement</text>
+
+      <!-- legend -->
+      <rect x="10" y="200" width="22" height="14" rx="3" class="box"/><text x="40" y="211" class="small">built (P0–P2)</text>
+      <rect x="10" y="222" width="22" height="14" rx="3" class="box-todo"/><text x="40" y="233" class="small">design only</text>
+    </svg>
+    </div>
+    <figcaption>Ingest, predict and budget are built and run every tick in about 7 ms. They only compute. Start windows and execute are the two stages that spend quota; neither is built yet, so today a tick never spends anything. When the budget says <code>extra_quota_to_spend_units = 0</code> (the usual case), the tick stops after budget.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ WHY CHAIN ============ -->
+<section id="why">
+  <div class="eyebrow">Read from the end</div>
+  <h2>Why each stage needs the one before</h2>
+  <p>Start from what finally runs, and ask what it needs to know. Each answer is exactly the output of the previous stage.</p>
+  <div class="chain">
+    <div class="link"><div class="who">6 · Execute<small>runs workers</small></div>
+      <div><div class="needs">needs: how many units, until when, from when, which tasks</div>
+      <div class="why">It must stop on its own: it works to a fixed mandate and never re-plans mid-run.</div></div></div>
+    <div class="arrow-row">↑ given by</div>
+    <div class="link"><div class="who">5 · Plan<small>the mandate</small></div>
+      <div><div class="needs">needs: <code>extra_quota_to_spend_units</code>, <code>spend_by_ts</code>, and <code>predicted_p95_human_usage_pct</code> for a last clamp</div>
+      <div class="why">Planning picks <em>when to start</em> and <em>what to run</em>. It cannot invent the amount; the amount comes from the week's arithmetic.</div></div></div>
+    <div class="arrow-row">↑ given by</div>
+    <div class="link"><div class="who">3 · Budget<small>how much, by when</small></div>
+      <div><div class="needs">needs: <code>week_used_pct</code>, <code>week_end_ts</code>, <code>window_used_pct</code>, <code>window_end_ts</code>, and <code>predicted_p95_human_usage_pct</code></div>
+      <div class="why">Without a forecast it would fill the running window up to 90% while the user may be in the middle of using it. The forecast sets how much of the window to hold back for the user.</div></div></div>
+    <div class="arrow-row">↑ given by</div>
+    <div class="link"><div class="who">2 · Predict<small>human demand ahead</small></div>
+      <div><div class="needs">needs: <code>slot_window_human_pct</code> per slot for the last 30 minutes and the open window, and <code>was_human_active</code></div>
+      <div class="why">It needs the <em>human</em> part only. Forecasting from the raw meter would read our own spend as user demand, and the bot would then refuse to spend: a loop that must never close.</div></div></div>
+    <div class="arrow-row">↑ given by</div>
+    <div class="link"><div class="who">1 · Ingest<small>what happened</small></div>
+      <div><div class="needs">needs: the raw meter readings, and our own bot run intervals</div>
+      <div class="why">The meter is one account-wide gauge read at irregular times (~24 readings a day on Claude, ~5 on Codex). Ingest turns that into a regular 5-minute table and splits each slot into human and bot.</div></div></div>
+  </div>
+</section>
+
+<!-- ============ BUDGET ============ -->
+<section id="budget">
+  <div class="stage-head"><div class="stage-no">3</div>
+    <div><h2>Budget <span class="badge built">built</span></h2>
+    <div class="q">How many units may the bot spend right now, and by when?</div></div></div>
+
+  <div class="io">
+    <div><div class="eyebrow">Needs</div><ul>
+      <li><code>week_used_pct</code>, <code>week_end_ts</code>: how much of the week is left, and when it resets</li>
+      <li><code>window_used_pct</code>, <code>window_end_ts</code>: the running window</li>
+      <li><code>predicted_p95_human_usage_pct</code>: what to hold back for the user in that window</li></ul></div>
+    <div><div class="eyebrow">Gives</div><ul>
+      <li><code>extra_quota_to_spend_units</code>: <b>spend this many units now</b></li>
+      <li><code>spend_by_ts</code>: before this instant, or it is lost</li>
+      <li><code>already_lost_units</code>: what no remaining window can absorb</li></ul></div>
+  </div>
+
+  <h3>Step 1 · How much can one window take?</h3>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 230" role="img" aria-label="The running window's 5-hour meter: 31 percent already used, 37 percent held back for the user as human_reserve_pct, leaving 32 percent for the bot by quota. By time, 62 minutes at 1 unit per hour allows 1.03 units. The smaller, 0.32 units, is max_spend_units, limited by quota.">
+      <defs><pattern id="hatch1" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" class="f-human-soft"/><line x1="0" y1="0" x2="0" y2="7" class="s-human" style="stroke-width:2"/></pattern></defs>
+      <text x="0" y="18" class="eyebrow bold">The running window, 100% of the 5-hour meter (running example)</text>
+      <!-- bar 100% = 700px from x=100 -->
+      <rect x="100" y="34" width="217" height="40" class="f-human"/>
+      <rect x="317" y="34" width="224" height="40" class="f-bot-soft"/>
+      <rect x="317" y="34" width="224" height="40" class="s-bot" style="stroke-width:2"/>
+      <rect x="541" y="34" width="259" height="40" fill="url(#hatch1)"/>
+      <rect x="100" y="34" width="700" height="40" class="s-line"/>
+      <text x="208" y="59" text-anchor="middle" class="bold" style="fill:var(--surface)">used 31%</text>
+      <text x="429" y="59" text-anchor="middle" class="bold t-bot">bot may spend 32%</text>
+      <text x="670" y="59" text-anchor="middle" class="bold t-human">held for the user 37%</text>
+      <text x="208" y="92" text-anchor="middle" class="mono small">window_used_pct</text>
+      <text x="429" y="92" text-anchor="middle" class="mono small">max_spend_units_by_quota = 0.32</text>
+      <text x="670" y="92" text-anchor="middle" class="mono small">human_reserve_pct</text>
+      <text x="670" y="107" text-anchor="middle" class="mono small t-muted">= max(MIN_HUMAN_RESERVE_PCT 10, predicted_p95 37)</text>
+      <text x="0" y="59" class="small t-muted">by quota</text>
+
+      <!-- by time -->
+      <text x="0" y="150" class="small t-muted">by time</text>
+      <rect x="100" y="132" width="700" height="28" class="f-soft"/>
+      <rect x="100" y="132" width="700" height="28" class="s-muted"/>
+      <text x="450" y="151" text-anchor="middle" class="small">62 minutes left × BOT_BURN_UNITS_PER_HOUR 1.0 = <tspan class="mono bold">max_spend_units_by_time = 1.03</tspan></text>
+
+      <!-- result -->
+      <text x="100" y="196" class="bold">max_spend_units = min(0.32, 1.03) = 0.32</text>
+      <text x="100" y="216" class="mono small t-muted">limited_by: "quota"   (the two limits are compared, never multiplied)</text>
+    </svg>
+    </div>
+    <figcaption>The bot may only use what the user will not need. That is where prediction comes in: <code>human_reserve_pct</code> is the larger of a fixed floor (10%) and the forecast. Every later, not-yet-open window uses the floor only, so it can take 0.90 units.</figcaption>
+  </figure>
+
+  <h3>Step 2 · Fill the remaining windows from the end of the week backwards</h3>
+  <figure>
+    <div class="controls">
+      <label for="bf-h">Time until <code>week_end_ts</code> <output id="bf-h-out">25 h 07</output>
+        <input id="bf-h" type="range" min="1" max="60" step="0.25" value="25.12"></label>
+      <label for="bf-w"><code>week.left_units</code> (units left in the week, user's and ours) <output id="bf-w-out">5.75</output>
+        <input id="bf-w" type="range" min="0" max="8.85" step="0.05" value="5.75"></label>
+    </div>
+    <div class="scroll"><svg id="bf-svg" class="wide" viewBox="0 0 900 260" role="img" aria-label="Interactive backwards fill: remaining windows to the weekly reset, each filled up to its max_spend_units starting from the last window."></svg></div>
+    <div class="readout">
+      <div><div class="v t-bot" id="bf-now" style="color:var(--bot)">0.85</div><div class="n">extra_quota_to_spend_units (the running window's share)</div></div>
+      <div><div class="v" id="bf-by">4 h 43</div><div class="n">spend_by_ts, from now (window end − 5 min)</div></div>
+      <div><div class="v" id="bf-lost" style="color:var(--lost)">1.30</div><div class="n">already_lost_units</div></div>
+    </div>
+    <figcaption>Default values are a real tick from 2026-10-04 (Claude, Sunday 19:52): every window to the reset is full and 1.30 units (about $41) still fit nowhere. Drag the reset further away and the running window drops to 0: the later windows absorb everything, so the bot waits and the user keeps first claim. This is "as late as possible", and it needs no forecast beyond the running window.</figcaption>
+  </figure>
+  <div class="formula">week.left_units = (100 − week_used_pct) / 100 × WEEK_CAPACITY_UNITS     # 8.85 Claude, 6.2 Codex
+for window in reversed(remaining_windows):
+    planned_units = min(max_spend_units, still_to_place)
+    still_to_place −= planned_units
+extra_quota_to_spend_units = remaining_windows[0].planned_units
+already_lost_units         = still_to_place</div>
+</section>
+
+<!-- ============ PREDICT ============ -->
+<section id="predict">
+  <div class="stage-head"><div class="stage-no">2</div>
+    <div><h2>Predict <span class="badge built">built</span></h2>
+    <div class="q">How much of the 5-hour meter will the user still burn before the window resets?</div></div></div>
+
+  <h3>Exactly what is predicted</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Question</th><th>Answer</th><th>Why that choice</th></tr></thead>
+    <tbody>
+      <tr><td>Which value</td><td><code>predicted_p95_human_usage_pct</code></td><td>The one number budget subtracts from the window.</td></tr>
+      <tr><td>Unit</td><td>% of the 5-hour meter, 0–100</td><td>The limit is enforced in percent. Units and dollars are display only.</td></tr>
+      <tr><td>Whose usage</td><td><span class="key h"></span>human only</td><td>Including bot spend would predict our own spend as demand and block it.</td></tr>
+      <tr><td>Which statistic</td><td>95th percentile, not the average</td><td>Under-predicting blocks the user. Over-predicting only leaves quota unspent, which the next tick can still recover.</td></tr>
+      <tr><td>Horizon</td><td><code>predicted_horizon_minutes</code> = min(minutes to <code>window_end_ts</code>, 120)</td><td>"40% over 34 min" and "40% over 120 min" are different claims. 120 = <code>FORECAST_HOURS</code> × 60, how long a measured pace is trusted.</td></tr>
+      <tr><td>Which window</td><td>the running one only, named by <code>window_end_ts</code></td><td>The backwards fill leaves every earlier window to the user anyway; later windows use <code>MIN_HUMAN_RESERVE_PCT</code>. Budget refuses a forecast whose window has since reset.</td></tr>
+      <tr><td>Freshness</td><td>every tick; older than 600 s = refused</td><td>A stale forecast can miss a user who just started.</td></tr>
+      <tr><td>If unreadable</td><td><code>100</code></td><td>Fail safe: a full reserve, nothing is spent.</td></tr>
+    </tbody></table></div>
+
+  <h3>How today's engine (recent-rate-v1) gets there</h3>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 250" role="img" aria-label="Timeline of the running window: human slots in the past, the last 30 minutes highlighted, then from now a forecast block of 62 minutes up to window_end_ts, holding 37 percent.">
+      <defs><pattern id="hatch2" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" class="f-human-soft"/><line x1="0" y1="0" x2="0" y2="7" class="s-human" style="stroke-width:2"/></pattern></defs>
+      <!-- axis: window 300 min over 800px from x=60 → 2.667 px/min. now at 238 min -->
+      <line x1="60" y1="170" x2="860" y2="170" class="s-line"/>
+      <line x1="60" y1="164" x2="60" y2="176" class="s-line"/>
+      <line x1="860" y1="30" x2="860" y2="176" class="s-line"/>
+      <text x="60" y="192" class="mono small">window opened</text>
+      <text x="860" y="192" text-anchor="end" class="mono small">window_end_ts</text>
+      <!-- past slots: 47 slots of 5 min, bars of human pct (scaled ×10px per %) -->
+      <g id="pred-bars"></g>
+      <!-- last 30 min band: 208..238 min → x 614.7..694.7 -->
+      <rect x="614.7" y="40" width="80" height="130" class="f-human-soft" style="opacity:.55"/>
+      <text x="654.7" y="34" text-anchor="middle" class="mono small t-human">last_30_min</text>
+      <!-- now -->
+      <line x1="694.7" y1="22" x2="694.7" y2="200" class="s-line" style="stroke-width:2"/>
+      <text x="694.7" y="214" text-anchor="middle" class="bold">now</text>
+      <!-- forecast block -->
+      <rect x="696" y="70" width="163" height="100" fill="url(#hatch2)"/>
+      <text x="777" y="98" text-anchor="middle" class="bold t-human">37%</text>
+      <text x="777" y="114" text-anchor="middle" class="small">predicted_p95_</text>
+      <text x="777" y="128" text-anchor="middle" class="small">human_usage_pct</text>
+      <!-- horizon bracket -->
+      <path d="M696,232 L696,238 L859,238 L859,232" class="s-line"/>
+      <text x="777" y="232" text-anchor="middle" class="mono small">predicted_horizon_minutes = 62</text>
+      <text x="380" y="232" text-anchor="middle" class="small t-muted">current_window: the whole open window so far (238 min)</text>
+      <path d="M60,222 L60,226 L692,226 L692,222" class="s-muted"/>
+      <text x="0" y="100" class="small t-muted" transform="rotate(-90 12 100)">slot_window_human_pct</text>
+    </svg>
+    </div>
+    <figcaption>Two measures of the user's pace, and the higher one wins. The last 30 minutes reacts fast to a burst. The whole-window average stops a 20-minute pause from reading as "the user left", which on 2026-10-04 made the first version predict 0% just before the user burned the remaining 69%.</figcaption>
+  </figure>
+  <div class="formula">rate  = max( last_30_min.human_avg_burn_rate  0.40 ,  current_window.human_avg_burn_rate  0.13 )   # % per minute
+        (raised to ACTIVE_HUMAN_BURN_RATE 0.15 if was_human_active but the meter has not moved yet)
+predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULTIPLIER
+                              = 0.40 × 62 × 1.5  =  37          (clamped to 100)</div>
+  <p class="muted">The engine is swappable. Budget reads only three fields (<code>predicted_p95_human_usage_pct</code>, <code>predicted_horizon_minutes</code>, <code>window_end_ts</code>); everything else sits under <code>internals</code>, and a test checks that blanking it changes nothing.</p>
+</section>
+
+<!-- ============ INGEST ============ -->
+<section id="ingest">
+  <div class="stage-head"><div class="stage-no">1</div>
+    <div><h2>Ingest <span class="badge built">built</span></h2>
+    <div class="q">What happened on the meter, slot by slot, and who caused it?</div></div></div>
+
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 330" role="img" aria-label="Raw meter readings at irregular times, one stale reading dropped, become eight 5-minute slots with slot_window_used_pct; slots during a bot run interval are coloured bot, the others human.">
+      <defs><marker id="m-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="f-muted"/></marker></defs>
+      <!-- x: 0..40 min over 720px from x=150 → 18 px/min -->
+      <text x="0" y="22" class="eyebrow bold">Raw readings</text>
+      <text x="0" y="40" class="small t-muted">window_used_pct,</text>
+      <text x="0" y="54" class="small t-muted">at irregular times</text>
+      <line x1="150" y1="60" x2="870" y2="60" class="s-grid"/>
+      <g id="ing-readings"></g>
+
+      <line x1="510" y1="88" x2="510" y2="112" class="s-muted" marker-end="url(#m-c)"/>
+      <text x="520" y="104" class="small t-muted">drop_stale_readings, then one row per 5 minutes</text>
+
+      <text x="0" y="140" class="eyebrow bold">slots.csv</text>
+      <text x="0" y="158" class="small t-muted">slot_window_used_pct</text>
+      <text x="0" y="172" class="small t-muted">(how much it moved)</text>
+      <!-- bot run interval 25..35 min → x 600..780 -->
+      <rect x="600" y="122" width="180" height="140" class="f-bot-soft" style="opacity:.6"/>
+      <text x="690" y="136" text-anchor="middle" class="small t-bot bold">bot run interval</text>
+      <g id="ing-slots"></g>
+      <line x1="150" y1="240" x2="870" y2="240" class="s-line"/>
+      <g id="ing-axis"></g>
+
+      <text x="0" y="300" class="eyebrow bold">split</text>
+      <rect x="150" y="288" width="14" height="14" class="f-human"/><text x="170" y="300" class="small">slot_window_human_pct (no bot running)</text>
+      <rect x="450" y="288" width="14" height="14" class="f-bot"/><text x="470" y="300" class="small">slot_window_bot_pct (our run, no human signal)</text>
+      <text x="150" y="322" class="small t-muted">Both running at once is rare by design; then the split is apportioned or kept as a lo/hi range (attribution = apportioned / censored).</text>
+    </svg>
+    </div>
+    <figcaption>The meter only says "the account is at 23%", never who spent it. Ingest makes three things that prediction cannot do without: a regular 5-minute table (so "the last 30 minutes" is 6 rows), stale readings removed (a lower value than one already seen in the window), and each slot's movement split into human and bot using our own run intervals.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Column in slots.csv</th><th>Unit</th><th>Used by</th></tr></thead>
+    <tbody>
+      <tr><td><code>slot_window_human_pct</code></td><td>% of the 5-hour meter, during the slot</td><td>predict: the user's pace</td></tr>
+      <tr><td><code>was_human_active</code></td><td>bool</td><td>predict: the active-human floor, before the meter ticks</td></tr>
+      <tr><td><code>window_used_pct</code>, <code>window_end_ts</code></td><td>%, epoch s</td><td>predict and budget: the running window</td></tr>
+      <tr><td><code>week_used_pct</code>, <code>week_end_ts</code></td><td>% of the 7-day meter, epoch s</td><td>budget: what is left of the week</td></tr>
+      <tr><td><code>slot_n_readings</code></td><td>count</td><td>tells "Mac asleep" from "idle" from "measured"</td></tr>
+    </tbody></table></div>
+</section>
+
+<!-- ============ START WINDOWS ============ -->
+<section id="start">
+  <div class="stage-head"><div class="stage-no">4</div>
+    <div><h2>Start windows <span class="badge todo">design only · P3</span></h2>
+    <div class="q">Is a window open? If not, open one.</div></div></div>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 170" role="img" aria-label="The last 15 hours before the weekly reset. With windows kept open, three windows fit. With a 3-hour gap where none runs, only two fit and up to one unit is lost.">
+      <!-- 15 h over 720px from x=150 → 48 px/h -->
+      <line x1="870" y1="16" x2="870" y2="130" class="s-line" style="stroke-width:2"/>
+      <text x="870" y="148" text-anchor="end" class="mono small">week_end_ts</text>
+      <text x="0" y="48" class="bold">Always open</text>
+      <rect x="150" y="30" width="238" height="28" rx="3" class="f-bot-soft"/><rect x="150" y="30" width="238" height="28" rx="3" class="s-bot"/>
+      <rect x="392" y="30" width="238" height="28" rx="3" class="f-bot-soft"/><rect x="392" y="30" width="238" height="28" rx="3" class="s-bot"/>
+      <rect x="634" y="30" width="236" height="28" rx="3" class="f-bot-soft"/><rect x="634" y="30" width="236" height="28" rx="3" class="s-bot"/>
+      <text x="269" y="49" text-anchor="middle" class="small">window</text><text x="511" y="49" text-anchor="middle" class="small">window</text><text x="752" y="49" text-anchor="middle" class="small">window</text>
+      <text x="0" y="98" class="bold">With a gap</text>
+      <rect x="150" y="80" width="144" height="28" rx="3" class="f-lost-soft"/>
+      <text x="222" y="99" text-anchor="middle" class="small t-lost">no window open (3 h)</text>
+      <rect x="298" y="80" width="238" height="28" rx="3" class="f-bot-soft"/><rect x="298" y="80" width="238" height="28" rx="3" class="s-bot"/>
+      <rect x="540" y="80" width="238" height="28" rx="3" class="f-bot-soft"/><rect x="540" y="80" width="238" height="28" rx="3" class="s-bot"/>
+      <rect x="782" y="80" width="88" height="28" rx="3" class="f-bot-soft"/><rect x="782" y="80" width="88" height="28" rx="3" class="s-bot"/>
+      <text x="417" y="99" text-anchor="middle" class="small">window</text><text x="659" y="99" text-anchor="middle" class="small">window</text><text x="826" y="99" text-anchor="middle" class="small">1.8 h</text>
+      <text x="150" y="160" class="small t-lost">up to 1 unit ≈ $32 lost ≈ 11% of the week</text>
+    </svg>
+    </div>
+    <figcaption>Budget's <code>remaining_windows</code> assumes a new window starts 5 minutes after the last one ends. A window only exists once a message opens it, so this stage sends a minimal <code>"ok"</code> whenever none is open. An opening costs about $0.02, and an open but unused window costs nothing. On Codex the same message also starts the 7-day period.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ PLAN ============ -->
+<section id="plan">
+  <div class="stage-head"><div class="stage-no">5</div>
+    <div><h2>Plan <span class="badge todo">design only · P5</span></h2>
+    <div class="q">From when, what, where, with which model?</div></div></div>
+  <div class="io">
+    <div><div class="eyebrow">Needs</div><ul>
+      <li><code>extra_quota_to_spend_units</code>, <code>spend_by_ts</code> from budget</li>
+      <li><code>predicted_p95_human_usage_pct</code>, <code>window_used_pct</code>: a last clamp</li>
+      <li><code>config.json</code>: repo list and weights, <code>QUIET_HOURS</code></li></ul></div>
+    <div><div class="eyebrow">Gives (the mandate)</div><ul>
+      <li><code>amount</code>: the units to spend, after the clamp</li>
+      <li><code>start_after</code> = <code>spend_by_ts</code> − lead time</li>
+      <li>profile, max workers, and a ranked queue of (repo, task) pairs</li></ul></div>
+  </div>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 200" role="img" aria-label="Within one window: the burst profile waits and starts 1 hour 21 minutes before spend_by_ts; the gentle profile, used in quiet hours, starts right away and trickles.">
+      <!-- window 300 min over 720 px from x=150 → 2.4 px/min ; spend_by_ts at 295 min → x=858 -->
+      <line x1="150" y1="150" x2="870" y2="150" class="s-line"/>
+      <text x="150" y="168" class="mono small">now (window open)</text>
+      <line x1="858" y1="20" x2="858" y2="156" class="s-line dash"/>
+      <text x="858" y="168" text-anchor="end" class="mono small">spend_by_ts</text>
+      <line x1="870" y1="20" x2="870" y2="156" class="s-line"/>
+      <text x="870" y="186" text-anchor="end" class="mono small t-muted">window_end_ts</text>
+
+      <text x="0" y="52" class="bold">burst</text><text x="0" y="68" class="small t-muted">day hours</text>
+      <rect x="150" y="38" width="514" height="26" class="f-soft"/>
+      <text x="407" y="56" text-anchor="middle" class="small t-muted">waits: the user keeps the window</text>
+      <rect x="664" y="38" width="194" height="26" class="f-bot"/>
+      <text x="761" y="56" text-anchor="middle" class="small bold" style="fill:var(--surface)">burns 0.9 at 1.0 unit/h</text>
+      <line x1="664" y1="30" x2="664" y2="72" class="s-line" style="stroke-width:2"/>
+      <text x="664" y="24" text-anchor="middle" class="mono small">start_after</text>
+
+      <text x="0" y="112" class="bold">gentle</text><text x="0" y="128" class="small t-muted">QUIET_HOURS</text>
+      <rect x="150" y="98" width="708" height="26" class="f-bot-soft"/>
+      <rect x="150" y="98" width="708" height="26" class="s-bot"/>
+      <text x="504" y="116" text-anchor="middle" class="small">1 cheap worker at 0.2 unit/h, from the start: lead time 6 h 45 is longer than the window</text>
+    </svg>
+    </div>
+    <figcaption>Lead time = <code>amount</code> ÷ intended rate × 1.5 safety. This is the only decision that can put the bot in the user's way, so in the day it starts as late as it can still finish and burns hard: a collision is bounded to the last hour of a window. At night there is nobody to collide with, so a slow, cheap trickle is fine.</figcaption>
+  </figure>
+  <div class="formula">amount = min( extra_quota_to_spend_units,
+              (100 − window_used_pct − predicted_p95_human_usage_pct) / 100,
+              MAX_DAILY_UNITS − units spent today )</div>
+  <p class="muted"><code>amount</code> and <code>start_after</code> are planning's own field names and are not in VOCABULARY.md yet.</p>
+</section>
+
+<!-- ============ EXECUTE ============ -->
+<section id="execute">
+  <div class="stage-head"><div class="stage-no">6</div>
+    <div><h2>Execute <span class="badge todo">design only · P4</span></h2>
+    <div class="q">Run the queue until the amount is spent or something says stop.</div></div></div>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 230" role="img" aria-label="Two workers run read-only tasks on different repos between start_after and spend_by_ts while the window meter rises; launching stops when the meter crosses the GUARD_PCT line.">
+      <!-- time 0..90 min over 720 px from x=150 → 8 px/min -->
+      <line x1="150" y1="20" x2="150" y2="186" class="s-line"/>
+      <text x="150" y="204" text-anchor="middle" class="mono small">start_after</text>
+      <line x1="870" y1="20" x2="870" y2="186" class="s-line dash"/>
+      <text x="870" y="204" text-anchor="end" class="mono small">spend_by_ts</text>
+      <line x1="150" y1="186" x2="870" y2="186" class="s-line"/>
+
+      <text x="0" y="44" class="bold">worker 1</text>
+      <rect x="152" y="30" width="190" height="22" rx="3" class="f-bot"/><text x="160" y="45" class="small" style="fill:var(--surface)">agent-statusline · bugs</text>
+      <rect x="350" y="30" width="230" height="22" rx="3" class="f-bot"/><text x="358" y="45" class="small" style="fill:var(--surface)">bootstrap-home · tests</text>
+      <rect x="588" y="30" width="150" height="22" rx="3" class="f-bot"/><text x="596" y="45" class="small" style="fill:var(--surface)">agent-notify · bugs</text>
+      <text x="0" y="78" class="bold">worker 2</text>
+      <rect x="152" y="64" width="250" height="22" rx="3" class="f-bot"/><text x="160" y="79" class="small" style="fill:var(--surface)">agent-usage-tracker · agent-docs</text>
+      <rect x="410" y="64" width="200" height="22" rx="3" class="f-bot"/><text x="418" y="79" class="small" style="fill:var(--surface)">agent-auto-resume · bugs</text>
+
+      <!-- meter line -->
+      <text x="0" y="128" class="small t-muted">window_used_pct</text>
+      <line x1="150" y1="120" x2="870" y2="120" class="s-lost dash"/>
+      <text x="866" y="114" text-anchor="end" class="mono small t-lost">GUARD_PCT: stop launching, stop newest worker</text>
+      <polyline points="150,176 250,170 350,160 450,150 550,140 650,130 738,124" class="s-bot" style="stroke-width:2"/>
+      <circle cx="738" cy="124" r="4" class="f-bot"/>
+      <text x="744" y="146" class="small">amount reached: stop</text>
+    </svg>
+    </div>
+    <figcaption>One supervisor runs a small pool of workers, at most one task per repo. Each worker is a read-only <code>claude -p</code> or <code>codex exec</code> that writes a Markdown report. Spend is measured on the meter, never in dollars. The run records its intervals so ingest can label those slots as bot.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Stops when</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td><code>amount</code> spent</td><td>no new launch; running workers finish</td></tr>
+      <tr><td><code>spend_by_ts</code> reached</td><td>no new launch; workers get a grace period, then are stopped</td></tr>
+      <tr><td>window above the <code>GUARD_PCT</code> line</td><td>no new launch; newest workers stopped first</td></tr>
+      <tr><td><code>config.json</code> disabled</td><td>everything stops at once</td></tr>
+    </tbody></table></div>
+</section>
+
+<!-- ============ GAPS ============ -->
+<section id="gaps">
+  <div class="eyebrow">Open points the diagrams make visible</div>
+  <h2>Known gaps</h2>
+  <div class="stack">
+    <div class="note"><b>Horizon ignored by budget.</b> With 240 minutes left in the window, the forecast covers only 120 (<code>predicted_horizon_minutes</code>), but budget uses <code>predicted_p95_human_usage_pct</code> as the reserve for the whole window. The last two hours have no forecast, so the reserve is too small.</div>
+    <div class="note"><b>Budget fills past the guard.</b> Budget fills a window up to 90% (<code>MIN_HUMAN_RESERVE_PCT</code> 10), but execute stops workers above 85% (<code>GUARD_PCT</code> 15). The last 5 points of every full window cannot be spent.</div>
+    <div class="note"><b><code>BOT_BURN_UNITS_PER_HOUR</code> is a guess (1.0).</b> It sets <code>max_spend_units_by_time</code> and the lead time. If it is too high, the bot underspends; it never collides. P4 measures it.</div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  /* ---- prediction past slots: deterministic human pct per slot ---- */
+  (function () {
+    var g = document.getElementById("pred-bars");
+    // 47 slots before now (238 min); last 6 = last_30_min; scale 10 px per %
+    var vals = [0,1,0,2,1,0,0,2,1,0, 0,1,0,0,1,0,0,0,2,1, 0,1,0,0,0,0,0,1,0,1, 0,0,2,0,0,0,0,0,0,2, 0,  2,3,2,1,2,2];
+    var pxm = 800 / 300;
+    for (var i = 0; i < vals.length; i++) {
+      var x0 = 60 + i * 5 * pxm + 0.6, w = 5 * pxm - 1.2, h = vals[i] * 18;
+      if (h > 0) g.appendChild(el("rect", { x: x0.toFixed(1), y: (170 - h).toFixed(1), width: w.toFixed(1), height: h, "class": "f-human" }));
+    }
+  })();
+
+  /* ---- ingestion figure ---- */
+  (function () {
+    var X = function (m) { return 150 + m * 18; };
+    var gr = document.getElementById("ing-readings");
+    var reads = [[1,20],[7,21],[9,19,1],[14,23],[22,23],[26,27],[33,28],[38,30]];
+    reads.forEach(function (r) {
+      var x = X(r[0]);
+      if (r[2]) {
+        gr.appendChild(el("circle", { cx: x, cy: 60, r: 6, "class": "f-surface" }));
+        gr.appendChild(el("circle", { cx: x, cy: 60, r: 6, "class": "s-lost" }));
+        gr.appendChild(el("line", { x1: x - 6, y1: 54, x2: x + 6, y2: 66, "class": "s-lost" }));
+        gr.appendChild(el("text", { x: x, y: 84, "text-anchor": "middle", "class": "mono small t-lost" }, r[1] + " stale"));
+      } else {
+        gr.appendChild(el("circle", { cx: x, cy: 60, r: 5, "class": "f-fg" }));
+        gr.appendChild(el("text", { x: x, y: 48, "text-anchor": "middle", "class": "mono small" }, r[1] + "%"));
+      }
+    });
+    var gs = document.getElementById("ing-slots"), ga = document.getElementById("ing-axis");
+    var d = [0,1,2,0,0,4,1,2], who = ["h","h","h","h","h","b","b","h"], n = [1,1,1,0,1,1,1,1];
+    for (var i = 0; i < 8; i++) {
+      var x = X(i * 5) + 3, w = 5 * 18 - 6, h = d[i] * 22;
+      gs.appendChild(el("rect", { x: x, y: 150, width: w, height: 90, "class": "s-grid" }));
+      if (h > 0) gs.appendChild(el("rect", { x: x, y: 240 - h, width: w, height: h, "class": who[i] === "b" ? "f-bot" : "f-human" }));
+      gs.appendChild(el("text", { x: x + w / 2, y: 236 - h, "text-anchor": "middle", "class": "mono small bold" }, "+" + d[i]));
+      ga.appendChild(el("text", { x: x + w / 2, y: 256, "text-anchor": "middle", "class": "mono small t-muted" }, "n=" + n[i]));
+    }
+    ga.appendChild(el("text", { x: 150, y: 272, "class": "small t-muted" }, "slot_n_readings per slot (n=0: no reading arrived)"));
+  })();
+
+  /* ---- interactive backwards fill ---- */
+  var H = document.getElementById("bf-h"), W = document.getElementById("bf-w");
+  var svg = document.getElementById("bf-svg");
+  var OPEN_LEFT_H = 4.8, OPEN_USED = 5, MIN_RES = 10, GAP_H = 5 / 60, BURN = 1.0, MARGIN_H = 5 / 60;
+  function hm(h) { var t = Math.round(h * 60); return Math.floor(t / 60) + " h " + String(t % 60).padStart(2, "0"); }
+  function draw() {
+    var hours = parseFloat(H.value), left = parseFloat(W.value);
+    document.getElementById("bf-h-out").textContent = hm(hours);
+    document.getElementById("bf-w-out").textContent = left.toFixed(2);
+    // remaining_windows
+    var wins = [], s = 0, first = true;
+    while (s < hours - 1e-9) {
+      var e = Math.min(s + (first ? OPEN_LEFT_H : 5), hours);
+      var dur = e - s;
+      var byQ = (100 - MIN_RES - (first ? OPEN_USED : 0)) / 100;
+      var byT = dur * BURN;
+      wins.push({ s: s, e: e, max: Math.max(0, Math.min(byQ, byT)), lim: byQ <= byT ? "quota" : "time", split: e >= hours - 1e-9 && dur < (first ? OPEN_LEFT_H : 5) - 1e-9, open: first });
+      s = e + GAP_H; first = false;
+    }
+    var rem = left;
+    for (var i = wins.length - 1; i >= 0; i--) { wins[i].plan = Math.max(0, Math.min(wins[i].max, rem)); rem -= wins[i].plan; }
+    rem = Math.max(0, rem);
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var x0 = 60, x1 = 860, base = 170, top = 40, unitPx = (base - top) / 1.0;
+    var X = function (h) { return x0 + (h / hours) * (x1 - x0); };
+    // gridline at 1 unit and 0.9
+    svg.appendChild(el("line", { x1: x0, y1: base - unitPx, x2: x1, y2: base - unitPx, "class": "s-grid" }));
+    svg.appendChild(el("text", { x: x0 - 6, y: base - unitPx + 4, "text-anchor": "end", "class": "mono small t-muted" }, "1 unit"));
+    svg.appendChild(el("text", { x: x0 - 6, y: base + 4, "text-anchor": "end", "class": "mono small t-muted" }, "0"));
+    wins.forEach(function (w, i) {
+      var a = X(w.s) + 1, b = X(w.e) - 1, ww = Math.max(1, b - a);
+      var hMax = w.max * unitPx, hPlan = w.plan * unitPx;
+      svg.appendChild(el("rect", { x: a, y: base - hMax, width: ww, height: hMax, "class": "f-soft" }));
+      svg.appendChild(el("rect", { x: a, y: base - hMax, width: ww, height: hMax, "class": "s-muted" }));
+      if (hPlan > 0) svg.appendChild(el("rect", { x: a, y: base - hPlan, width: ww, height: hPlan, "class": w.open ? "f-bot" : "f-bot-soft" }));
+      if (hPlan > 0 && !w.open) svg.appendChild(el("rect", { x: a, y: base - hPlan, width: ww, height: hPlan, "class": "s-bot" }));
+      if (ww > 34) svg.appendChild(el("text", { x: a + ww / 2, y: base - hMax - 6, "text-anchor": "middle", "class": "mono small" }, w.plan.toFixed(2)));
+    });
+    // axis
+    svg.appendChild(el("line", { x1: x0, y1: base, x2: x1, y2: base, "class": "s-line" }));
+    svg.appendChild(el("line", { x1: x1, y1: 22, x2: x1, y2: base + 6, "class": "s-line", style: "stroke-width:2" }));
+    svg.appendChild(el("text", { x: x1, y: 16, "text-anchor": "end", "class": "mono small" }, "week_end_ts"));
+    svg.appendChild(el("text", { x: x0, y: base + 18, "class": "mono small bold t-bot" }, "now · running window"));
+    svg.appendChild(el("text", { x: x0, y: 16, "class": "small t-muted" }, "planned_units per window (outline = max_spend_units)"));
+    // fill-order arrow
+    svg.appendChild(el("text", { x: (x0 + x1) / 2, y: base + 18, "text-anchor": "middle", "class": "small t-muted" }, "← filled in this order, starting from the reset"));
+
+    // week.left_units bar
+    var by = 210, scale = (x1 - x0) / 8.85, cx = x0;
+    svg.appendChild(el("text", { x: x0, y: by - 6, "class": "small t-muted" }, "where week.left_units goes"));
+    wins.forEach(function (w) {
+      if (w.plan <= 0) return;
+      var ww = w.plan * scale;
+      svg.appendChild(el("rect", { x: cx, y: by, width: ww, height: 20, "class": w.open ? "f-bot" : "f-bot-soft" }));
+      svg.appendChild(el("rect", { x: cx, y: by, width: ww, height: 20, "class": "s-bot" }));
+      cx += ww;
+    });
+    if (rem > 0) {
+      svg.appendChild(el("rect", { x: cx, y: by, width: rem * scale, height: 20, "class": "f-lost-soft" }));
+      svg.appendChild(el("rect", { x: cx, y: by, width: rem * scale, height: 20, "class": "s-lost" }));
+      if (rem * scale > 110) svg.appendChild(el("text", { x: cx + rem * scale / 2, y: by + 14, "text-anchor": "middle", "class": "small t-lost bold" }, "already_lost_units"));
+    }
+    svg.appendChild(el("text", { x: x0, y: by + 40, "class": "mono small t-muted" }, "0"));
+    svg.appendChild(el("text", { x: x1, y: by + 40, "text-anchor": "end", "class": "mono small t-muted" }, "8.85 units = a full Claude week"));
+
+    var now = wins.length ? wins[0].plan : 0;
+    document.getElementById("bf-now").textContent = now.toFixed(2);
+    document.getElementById("bf-by").textContent = now > 0 ? hm(Math.max(0, wins[0].e - MARGIN_H)) : "—";
+    document.getElementById("bf-lost").textContent = rem.toFixed(2);
+  }
+  H.addEventListener("input", draw); W.addEventListener("input", draw);
+  draw();
+})();
+</script>
+</body>
+</html>

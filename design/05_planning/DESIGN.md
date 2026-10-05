@@ -5,7 +5,7 @@ Stage 5 turns the budget into the **execution mandate**: for each agent, how muc
 | | |
 |---|---|
 | Command | `aqm plan [--budget PATH] [--out PATH]` |
-| Reads | `state/buckets.jsonl`, the latest budget (`../03_budgeting/DESIGN.md` §3), the latest prediction, `config.json` |
+| Reads | `data/<agent>/slots.csv`, the latest budget (`../03_budgeting/DESIGN.md` §3), the latest prediction, `config.json` |
 | Writes | `artifacts/plans/<date>/<time>.json` |
 | Acts | No |
 | Consumed by | `../06_execution/DESIGN.md` |
@@ -25,8 +25,8 @@ start_after = deadline − lead_time
 
 | Profile    | When                                     | `intended_rate`          | Workers                        | Models                 | Lead time for 0.9 unit            | Behaviour                                                                   |
 | ---------- | ---------------------------------------- | ------------------------ | ------------------------------ | ---------------------- | --------------------------------- | --------------------------------------------------------------------------- |
-| **gentle** | Inside `QUIET_HOURS` (00:00–09:00 local) | `GENTLE_RATE` 0.2 unit/h | 1                              | Cheap, long tasks      | 6h45 — longer than a whole window | Starts as soon as a chunk has an amount due, and trickles through the night |
-| **burst**  | Any other hour                           | `BURST_RATE` 1.0 unit/h  | Up to `MAX_PARALLEL_PER_AGENT` | Expensive, short tasks | 1h20                              | Holds back, then burns hard near the end of the chunk                       |
+| **gentle** | Inside `QUIET_HOURS` (00:00–09:00 local) | `GENTLE_RATE` 0.2 unit/h | 1                              | Cheap, long tasks      | 6h45 — longer than a whole window | Starts as soon as a window has an amount due, and trickles through the night |
+| **burst**  | Any other hour                           | `BOT_BURN_UNITS_PER_HOUR` 1.0 unit/h  | Up to `MAX_PARALLEL_PER_AGENT` | Expensive, short tasks | 1h20                              | Holds back, then burns hard near the end of the window                       |
 
 Why the two differ: during the user's hours a collision must be **short**, so the system waits and then burns fast — the worst case is being in the way until the window ends. At night there is nothing to collide with, so a slow cheap trickle is better: it leaves time to notice problems, and cheap models read more code per unit spent. Converting a bounded 5-hour risk into an unbounded 7-day one is exactly what this design refuses to do (`../03_budgeting/PREVIOUS_IDEAS.md` §4.5).
 
@@ -37,33 +37,33 @@ Why the two differ: during the user's hours a collision must be **short**, so th
 ## 2. Output: the execution mandate
 
 ```json
-{"computed_at": 1790170589, "config_hash": "9f2c…",
+{"computed_ts": 1790170589, "config_hash": "9f2c…",
  "agents": {
-   "claude": {"amount": 0.30, "deadline": 1790188200, "start_after": 1790186400,
+   "claude": {"amount": 0.30, "spend_by_ts": 1790188200, "start_after": 1790186400,
               "profile": "gentle", "max_parallel": 1,
               "queue": [
                 {"repo": "~/dev/agent-statusline", "category": "bugs", "rank": 3.2,
                  "model": "sonnet", "effort": "high", "estimate_units": 0.25, "estimate_minutes": 12,
                  "why": {"repo_weight": 1.0, "category_weight": 1.0, "staleness_days": 3.2}}]},
-   "codex":  {"amount": 0.0, "deadline": null, "start_after": null,
+   "codex":  {"amount": 0.0, "spend_by_ts": null, "start_after": null,
               "profile": "gentle", "max_parallel": 1, "queue": []}}}
 ```
 
 | Field | Where it comes from |
 |---|---|
-| `amount` | `budget.amount_due`, clamped by the room left in the window (§3) and by `MAX_DAILY_UNITS` minus what was already spent today |
-| `deadline` | Straight from the budget (`../03_budgeting/DESIGN.md` §2) |
+| `amount` | `budget.extra_quota_to_spend_units`, clamped by the room left in the window (§3) and by `MAX_DAILY_UNITS` minus what was already spent today |
+| `spend_by_ts` | Straight from the budget (`../03_budgeting/DESIGN.md` §2) |
 | `start_after` | `deadline − lead_time(amount)` (§1): the moment work should begin, which is what makes the system hold back during the user's hours and trickle at night |
 | `profile`, `max_parallel` | The execution profile of §1, from `QUIET_HOURS` |
 | `queue` | Ranked candidates, §4 |
 
-An agent with `amount = 0` has nothing to run; `deadline` and `start_after` are then `null`. The queue is candidates, not commitments: the executor pops from it, skips repos whose lock is held, and stops whenever budget or deadline says so. Re-running `aqm plan` after a run reflects the new staleness.
+An agent with `amount = 0` has nothing to run; `spend_by_ts` and `start_after` are then `null`. The queue is candidates, not commitments: the executor pops from it, skips repos whose lock is held, and stops whenever budget or deadline says so. Re-running `aqm plan` after a run reflects the new staleness.
 
 ## 3. The room test
 
 ```text
 room = 1 − window_used − prediction.window.p95
-amount = min(budget.amount_due, room, MAX_DAILY_UNITS − spent_today)
+amount = min(budget.extra_quota_to_spend_units, room, MAX_DAILY_UNITS − spent_today)
 ```
 
 This is the general form of what would otherwise be a yes/no veto: a user spending right now produces a `p95` close to a full window, which leaves no room and keeps that agent out of the plan entirely, while a user who sent one small message does not. With a real predictor the same line also holds back work before a user who is merely *likely* to arrive.

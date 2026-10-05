@@ -12,7 +12,7 @@ Candidate policies deciding **when** extra work runs and **how much** of it, for
 | C2 | Blocking of the 5-hour window while the user works (the expensive kind of blocking) | §4.1 |
 | C3 | Blocking of the 7-day period, weighted by the time left before the reset | §4.2 |
 | C4 | Robustness: behaviour on an away week, a heavy week, an unexpected deadline | §7.4 |
-| C5 | Inputs needed: quota readings only, or also organic/extra separation and a forecast | §7.8 |
+| C5 | Inputs needed: quota readings only, or also human/extra separation and a forecast | §7.8 |
 | C6 | Portability to Codex, whose reset time moves and can be pulled forward | §5, §4.4 |
 | C7 | Explainability and amount of machinery | §17.1 |
 
@@ -32,7 +32,7 @@ every night, between 00:00 and 10:00 local time:
 
 ### 2.1 Strengths
 
-- **No predictor at all.** Only the quota readings are needed: no session parsing, no tagging of organic versus extra work, no profile (C5). This also sidesteps §7.8 entirely (past usage mixes organic and extra).
+- **No predictor at all.** Only the quota readings are needed: no session parsing, no tagging of human versus extra work, no profile (C5). This also sidesteps §7.8 entirely (past usage mixes human and extra).
 - **Self-correcting every 24h.** A heavy day lowers `R`, so the next night runs less; a light day leaves more. No model is needed for this feedback.
 - **Runs when the user is away.** Nights are where interference is near zero (§4.3), so C2 is mostly satisfied by construction.
 - **Trivial to explain, to simulate and to debug** (C7).
@@ -54,7 +54,7 @@ every night, between 00:00 and 10:00 local time:
 | Variant | Effect |
 |---|---|
 | `D` from history rather than fixed (daily p90 per weekday) | Keeps the weekly rhythm without a model |
-| "No organic activity for X hours" lowers `D` | Cheap away-day detection from quota readings only |
+| "No human activity for X hours" lowers `D` | Cheap away-day detection from quota readings only |
 | Live guard: no extra work if the user was active in the last N minutes, and keep p% of the 5-hour window free | Covers C2 without any prediction |
 | Windows instead of days: top up to `reserve_target` expressed in windows still to come | Aligns with §6.3 |
 
@@ -67,9 +67,9 @@ Claude, reset Monday 21:00 Paris. Each 5-hour window is identified by when it op
 | Step | Rule |
 |---|---|
 | 1 | Make sure a 5-hour window has opened before **11:00** (the reset minus two windows), so that two full windows still fit before 21:00. Opening it is the job of the window starter (`../04_start_windows/CONSIDERATIONS.md`). |
-| 2 | **One hour before that window ends:** if the user did no organic work during it and at least 1.5 units are left, spend 0.6 unit immediately, keeping 0.9 for the last window. |
+| 2 | **One hour before that window ends:** if the user did no human work during it and at least 1.5 units are left, spend 0.6 unit immediately, keeping 0.9 for the last window. |
 | 3 | Make sure a 5-hour window has opened before **16:00** (the reset minus one window), so the last window ends exactly at the reset. |
-| 4 | **One hour before that window ends (around 20:00):** if the user did little or no organic work during it and quota is left, spend all of it before the window closes. |
+| 4 | **One hour before that window ends (around 20:00):** if the user did little or no human work during it and quota is left, spend all of it before the window closes. |
 
 Properties:
 
@@ -136,7 +136,7 @@ The trigger is therefore not a fixed "one hour before the end" but the moment wh
 
 ### 4.3 Strengths
 
-- **No prediction of any kind.** Only quota readings, window timings and the achievable burn rate are needed; no session parsing, no organic/extra separation, no profile (C5).
+- **No prediction of any kind.** Only quota readings, window timings and the achievable burn rate are needed; no session parsing, no human/extra separation, no profile (C5).
 - **The user always has priority.** Back-filling means nothing is ever spent while a later window could still absorb it, so the system takes only what would otherwise expire (C1 with minimal C2).
 - **The reset boundary is handled explicitly.** Splitting the straddling window prevents a saturated window from carrying into the new week (`../CONSIDERATIONS.md` §13).
 - **Self-correcting.** The user's own usage lowers the remaining quota, so the next tick simply plans less; a missed window or an early Codex reset changes the chain and the plan follows.
@@ -190,14 +190,14 @@ Run extra work only when the remaining quota exceeds what the windows still to c
 
 ## 6. Policy C — Predictive planner (`../DESIGN_v1.md` §2)
 
-Re-plan every 30 minutes over the rest of the 7-day period: keep a reserve equal to a high quantile of the forecast organic demand until the reset, and place the rest in the slots where the user is least likely to be active, subject to the 5-hour caps and a window guard.
+Re-plan every 30 minutes over the rest of the 7-day period: keep a reserve equal to a high quantile of the forecast human demand until the reset, and place the rest in the slots where the user is least likely to be active, subject to the 5-hour caps and a window guard.
 
 - **Strengths:** nothing is hard-coded (night, `D`, `F` and the final-day reserve all emerge from the data); away weeks and heavy weeks are handled; the last hours before the reset are used when the user is idle; it adapts to Codex's moving reset (C4, C6).
-- **Drawbacks:** needs the predictor and therefore the separation of organic from extra usage (C5); several parameters; its behaviour is harder to explain than a rule (C7); its advantage over Policy A is unproven, and with about 4 weeks of history it may not be measurable.
+- **Drawbacks:** needs the predictor and therefore the separation of human from extra usage (C5); several parameters; its behaviour is harder to explain than a rule (C7); its advantage over Policy A is unproven, and with about 4 weeks of history it may not be measurable.
 
 ## 7. How to choose
 
-Simulate the policies (and the variants of §2.3) on the recorded history, replaying the user's organic usage as demand and the quota rules of `CONCLUSIONS.md`:
+Simulate the policies (and the variants of §2.3) on the recorded history, replaying the user's human usage as demand and the quota rules of `CONCLUSIONS.md`:
 
 | Measure | Target |
 |---|---|
@@ -210,5 +210,5 @@ Policy D is the baseline, since it needs no prediction and follows the quota mec
 ## 8. Open points
 
 - The maximum burn rate per agent is unknown, so how much of a night can actually be spent is unknown (§6.6).
-- Simulating a policy on history requires replaying organic demand, which is itself censored by past caps (§7 of the prediction designs).
+- Simulating a policy on history requires replaying human demand, which is itself censored by past caps (§7 of the prediction designs).
 - Codex's early server resets make any day-counting rule fragile (§5).

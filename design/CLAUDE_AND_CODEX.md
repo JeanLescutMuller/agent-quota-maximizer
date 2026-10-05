@@ -35,9 +35,9 @@ Only five weeks of data, and both columns understate demand: when a window satur
 | 5-hour window | `rate_limits.primary`; opens on the first message after the previous expired | Same, 300 min | Identical handling; the window starter is agent-agnostic here |
 | 7-day period | **Fixed: every Monday 19:00 UTC** | `rate_limits.secondary`, 10,080 min, **starts at the first message after idle** | On Codex, idle time is not banked: the later a week starts, the fewer weeks per year |
 | Reset times | Exact and known in advance | Drift, and can be pulled forward by the server: observed 09-07 19:20, 09-15 09:14, 09-19 11:24, then 09-28 04:13 **and** 09:05 for the same period **[verified]** | No Codex schedule can be precomputed; the meter is re-read every tick for both |
-| Does a 7-day reset also reset the 5-hour window? | No: the running window keeps its % and its end (seen twice) | No at a natural expiry (seen once, at 1–2%); **yes** at the 08-27 server-side early reset, which re-anchored both | The chunk split at the reset is correct for both (`03_budgeting/DESIGN.md` §2) |
+| Does a 7-day reset also reset the 5-hour window? | No: the running window keeps its % and its end (seen twice) | No at a natural expiry (seen once, at 1–2%); **yes** at the 08-27 server-side early reset, which re-anchored both | The window split at the reset is correct for both (`03_budgeting/DESIGN.md` §2) |
 | Idle reading | `null`, 0% | A fake countdown: `used_percent == 0` with `resets_at ≈ now + span` | Codex's must be dropped, or the system believes a fresh window is open (`01_ingestion/DESIGN.md` §5) |
-| Meter freshness | **Free live push**: every Claude Code render carries `rate_limits` on its own `/v1/messages` response | No equivalent. Two feeds: `token_count` events inside a running session (exact, free) and the poller (~5 min) | Between Codex sessions the meter is up to 5 minutes stale; `READING_MAX_AGE` is sized for the worse of the two |
+| Meter freshness | **Free live push**: every Claude Code render carries `rate_limits` on its own `/v1/messages` response | No equivalent. Two feeds: `token_count` events inside a running session (exact, free) and the poller (~5 min) | Between Codex sessions the meter is up to 5 minutes stale; `READING_MAX_AGE_SECONDS` is sized for the worse of the two |
 | Usage visible locally | Complete: every % step since 09-13 matched a local message | Only what this machine ran; cloud, IDE and ChatGPT-app usage raise the meter with no local trace | Spend attribution is weaker on Codex; signal S3 exists for exactly this (`02_prediction/DESIGN.md` §3) |
 | Pricing | Known and validated: opus 5/25, sonnet 2/10, haiku 1/5 per MTok; the 2.5× Opus/Sonnet ratio matches the meter | **Assumed**: `gpt-5.6-sol` list price 5/30 per MTok | Codex dollars are indicative; percentages are safe on both, which is why the budget is enforced on the meter |
 | USD reported by the agent | Only from `claude -p`, and at **list** basis (`costBasis: "list"`) **[verified]** | **None at all** | No agent reports subscription-basis dollars; USD is never a budget |
@@ -52,12 +52,12 @@ Only five weeks of data, and both columns understate demand: when a window satur
 | Primary feed | Statusline push into `data/claude/account.jsonl`, at no network cost | `token_count` events in `~/.codex/sessions/**/*.jsonl` (exact, only while a session runs) |
 | Fallback feed | A scheduled poller — but **8,516 of its 12,848 rows carry a real error** (SSL, HTTP 429, missing token) **[verified]**, so the push path does ~92% of the work | The poller in `data/codex/account.jsonl` (~5 min), sharing that transport |
 | Trap | Idle renderers re-push day-old readings, so line order lies | The fake idle countdown looks like a fresh empty window, and its reset time moves every tick |
-| Readings surviving the envelope | **23/day** **[verified 2026-10-04]** | **4.6/day** — five times sparser, and sparsest while a session is running, because the poller stands down then **[verified]** |
+| Readings surviving the drop_stale_readings | **23/day** **[verified 2026-10-04]** | **4.6/day** — five times sparser, and sparsest while a session is running, because the poller stands down then **[verified]** |
 | Reset time, as recorded | Epoch-seconds *string* on push rows, ISO on poller rows | Epoch integer, drifting ±1 s between readings of one window **[verified]** |
 
-The traps are defeated by three rules, which is why they live in ingestion and not here: readings are keyed by `observed_at`; within a window only the first reading of each new maximum is kept; and the window key is a reset time rounded to the minute, after fake countdowns have been dropped (`01_ingestion/DESIGN.md` §5).
+The traps are defeated by three rules, which is why they live in ingestion and not here: readings are keyed by `observed_ts`; within a window only the first reading of each new maximum is kept; and the window key is a reset time rounded to the minute, after fake countdowns have been dropped (`01_ingestion/DESIGN.md` §5).
 
-## 4. Telling organic work from our own
+## 4. Telling human work from our own
 
 **No meter reading carries a session id on either agent, and none can** — the meter is account-level (`USAGE_DATA_SOURCES.md` §2.3). Attribution is therefore done by **time interval**, not by session: the executor records when its own work ran, and everything else that moved the meter was the user (`01_ingestion/DESIGN.md` §1). That is agent-agnostic, and it is the one attribution method that also catches Codex usage from clients this machine cannot see.
 
@@ -68,11 +68,11 @@ The per-agent session markers still exist, and are what a finer future attributi
 | Claude | The executor generates the session UUID and passes `--session-id`; the `.jsonl` transcript is `<uuid>.jsonl` **[verified]** | Two more, in the recorded data itself: our requests carry `query_source: "sdk"` in telemetry, and a headless run writes no status-line row at all **[verified 2026-10-04]** |
 | Codex | `codex exec -C <scratch dir>` **[verified]**; `session_meta` carries that `cwd`, and the executor records the rollout file that appears | Our work always runs with our model and effort settings |
 
-**The asymmetry is now larger, not smaller.** On Claude, both halves of an overlapping interval are measurable in dollars per request: the user's from status-line rows and non-`sdk` telemetry, ours from `sdk` telemetry — and because headless runs never render, the push feed is organic-only by construction (`USAGE_DATA_REFERENCE.md` §1, §2.1, §9). On Codex there is **no USD on any channel and no session scope at all**, so an overlapping interval can only ever be bounded, never apportioned. Claude **hooks** carry no usage data either **[docs]**.
+**The asymmetry is now larger, not smaller.** On Claude, both halves of an overlapping interval are measurable in dollars per request: the user's from status-line rows and non-`sdk` telemetry, ours from `sdk` telemetry — and because headless runs never render, the push feed is human-only by construction (`USAGE_DATA_REFERENCE.md` §1, §2.1, §9). On Codex there is **no USD on any channel and no session scope at all**, so an overlapping interval can only ever be bounded, never apportioned. Claude **hooks** carry no usage data either **[docs]**.
 
-Ranked by reliability, the signals that the *user* is spending are the same three in shape on both agents (meter movement we did not cause, a session file we did not create being touched, a non-`sdk` request arriving), but the third exists only on Claude and the latency of the first differs: 23 readings a day on Claude against 4.6 on Codex (`02_prediction/DESIGN.md` §3).
+Ranked by reliability, the signals that the *user* is spending differ by agent, and the cheap one that looked agent-agnostic turned out not to be a signal at all. Meter movement we did not cause works on both. Beyond that, Claude has two account-side confirmations — a new push row, and a non-`sdk` telemetry row — while Codex has only its own session files, which must be **tailed** rather than stated, because a file's mtime moves without anything happening in it (`01_ingestion/DESIGN.md` §3.1). The latency of the first signal also differs sharply: 23 meter readings a day on Claude against 4.6 on Codex (`02_prediction/DESIGN.md` §3).
 
-Anything unclassifiable counts as organic on both — the conservative direction.
+Anything unclassifiable counts as human on both — the conservative direction.
 
 ## 5. Launching extra work
 
@@ -110,7 +110,7 @@ The one asymmetry is confidence in the deadline: Claude's is exact, Codex's is u
 
 ### 6.3 Two agents, one machine
 
-- **Separate state per agent** (`state/buckets.jsonl` holds an `agent` column, and the meter file is per agent), one artifact per tick with a section per agent, separate budgets, separate parameters, separate daily caps.
+- **Separate state per agent** (`data/<agent>/slots.csv` holds an `agent` column, and the meter file is per agent), one artifact per tick with a section per agent, separate budgets, separate parameters, separate daily caps.
 - **One supervisor covers both**, since their quotas are independent and the plan carries both mandates. What they share is the repo locks and the global worker cap (`06_execution/DESIGN.md` §2).
 - **The room test is per agent.** The user working in Claude does not keep Codex extra work out of the plan, and vice versa — they are separate quotas — but a shared machine means both compete for CPU, which `MAX_PARALLEL_TOTAL` bounds.
 - **Waste is measured per agent**, and the notebook reports both (`07_pipeline/DESIGN.md` §8).

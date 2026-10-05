@@ -8,7 +8,7 @@ Stage 4, and the first stage that acts. A window exists only because a message o
 | Reads | The meter only (`../01_ingestion/DESIGN.md` §2) |
 | Writes | A minimal message per agent needing one; a spend record |
 | Acts | **Yes**, ≈ $0.02 per opening |
-| Consumed by | Nothing — it makes the budget stage's chunk chain true rather than hypothetical |
+| Consumed by | Nothing — it makes the budget stage's chain of remaining windows true rather than hypothetical |
 
 The context, the measured idle gaps and the worked example of what a missing window costs are in `CONSIDERATIONS.md` next to this file.
 
@@ -42,7 +42,7 @@ On Codex the stakes are higher still: the 7-day period itself starts at the firs
 ## 3. Two things the rule deliberately does not check
 
 - **Whether the user is active.** If they are, they open the window themselves and our message is a redundant $0.02.
-- **Whether the reset is close.** A window opened just before the reset straddles it, which is desirable: it captures the trailing capacity. The budget stage's chunk split already stops the post-reset part from being saturated (`../03_budgeting/DESIGN.md` §2).
+- **Whether the reset is close.** A window opened just before the reset straddles it, which is desirable: it captures the trailing capacity. The budget stage's window split already stops the post-reset part from being saturated (`../03_budgeting/DESIGN.md` §2).
 
 ## 4. The message
 

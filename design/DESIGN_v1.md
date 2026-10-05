@@ -25,11 +25,11 @@ Status: **scoping only, not implemented.**
 
 ## 2. Budgeting and scheduling of extra work
 
-The system decides **when** and **how much** extra work to run with a planner that re-plans every 30 minutes over the rest of the 7-day period. This is one of the candidate policies of `03_budgeting/PREVIOUS_IDEAS.md`, which also documents the simpler rule-based ones (a fixed nightly top-up needing no prediction, and the waste-free floor alone) and how to choose between them. Its behaviour (running at night, keeping a daily reserve for the user, using the last hours before the reset) is not hard-coded: it follows from a profile of the user's organic usage learned from past data. The reasoning behind each choice is in `CONSIDERATIONS.md` (§1–§8).
+The system decides **when** and **how much** extra work to run with a planner that re-plans every 30 minutes over the rest of the 7-day period. This is one of the candidate policies of `03_budgeting/PREVIOUS_IDEAS.md`, which also documents the simpler rule-based ones (a fixed nightly top-up needing no prediction, and the waste-free floor alone) and how to choose between them. Its behaviour (running at night, keeping a daily reserve for the user, using the last hours before the reset) is not hard-coded: it follows from a profile of the user's human usage learned from past data. The reasoning behind each choice is in `CONSIDERATIONS.md` (§1–§8).
 
 ### 2.1 Units and inputs
 
-- **Unit:** `1 unit` = the quota of one full 5-hour window. Every amount (remaining quota, reserve, spend) is expressed in units, and converted to and from % and USD with the figures of `~/dev/agent-statusline/adhoc_quotas_analysis/CONCLUSIONS.md` (Claude Pro: 1 unit ≈ $32, a week ≈ 8.85 units; Codex Plus: 1 unit ≈ $20.5, a week ≈ 6.2 units).
+- **Unit:** `1 unit` = the quota of one full 5-hour window. Every amount (remaining quota, reserve, spend) is expressed in units, and converted to and from % and USD with the figures of `~/dev/agent-usage-tracker/adhoc_quotas_analysis/CONCLUSIONS.md` (Claude Pro: 1 unit ≈ $32, a week ≈ 8.85 units; Codex Plus: 1 unit ≈ $20.5, a week ≈ 6.2 units).
 - **Quota readings:** read from `~/opt/agent-statusline/state/quota/{claude,codex}` (current) and `~/opt/agent-statusline/data/*-quota-history.jsonl` (history). This system never fetches quotas itself.
 - **Window rules:** taken from `CONCLUSIONS.md` §1.1 (activity-triggered 5-hour windows, Claude week fixed at Monday 19:00 UTC, Codex week pinned by the first message and subject to early resets, a weekly reset does not reset the 5-hour window).
 - **Organic usage history:** per-message spend from local session files (Claude transcripts, Codex session files). Sessions started by this system are tagged so they can be excluded.
@@ -41,8 +41,8 @@ The usage profile and nowcast below form the `organic_usage_predictor`; its cand
 
 | Component | Role |
 |---|---|
-| **Usage profile** | For each hour of the week (local time, Europe/Paris), the distribution of organic spend and the probability that the user is active. Learned from organic sessions only. To cope with few weeks of data, hours are pooled (weekday vs weekend × hour of day). |
-| **Nowcast** | Short-term correction of the profile from recent activity: whether an organic message arrived in the last 30–60 minutes. An active user is likely to stay active over the next hours, an idle one to stay idle. |
+| **Usage profile** | For each hour of the week (local time, Europe/Paris), the distribution of human spend and the probability that the user is active. Learned from human sessions only. To cope with few weeks of data, hours are pooled (weekday vs weekend × hour of day). |
+| **Nowcast** | Short-term correction of the profile from recent activity: whether an human message arrived in the last 30–60 minutes. An active user is likely to stay active over the next hours, an idle one to stay idle. |
 | **Planner** | Places the extra spend needed before the reset into the future slots where it interferes least with the user, subject to the quota rules. |
 | **Window guard** | Before anything runs, checks that the current 5-hour window keeps enough room for the user's forecast spend in that window. |
 
@@ -53,16 +53,16 @@ Every 30 minutes, for each agent:
 ```text
 R        = remaining 7-day quota (units)
 slots    = 30-min slots from now until the 7-day reset
-organic  = forecast organic spend per slot (profile, corrected by the nowcast for the next hours)
+human  = forecast human spend per slot (profile, corrected by the nowcast for the next hours)
 
-reserve  = q-quantile of total organic spend from now until the reset
+reserve  = q-quantile of total human spend from now until the reset
 extra    = max(0, R − reserve)                  # quota that would otherwise be wasted
 
 cost(s)  = P(user active in slot s) × blocking_penalty
          + carry_over_penalty   if the 5-hour window of slot s runs past the 7-day reset
 
 fill `extra` into slots by increasing cost(s), subject to:
-    - a 5-hour window holds at most 1 unit, minus its forecast organic spend
+    - a 5-hour window holds at most 1 unit, minus its forecast human spend
     - at most the achievable burn rate per slot
     - a window only exists once work starts in it (the plan decides when to open windows)
 
@@ -78,7 +78,7 @@ Only the current slot of the plan is ever executed. Readings, the nowcast and th
 | Behaviour | Why it follows from the planner |
 |---|---|
 | Extra work runs at night | Night slots have P(user active) ≈ 0 in the data, so they are the cheapest and are filled first. |
-| About 2 units stay free for each remaining day | `reserve` is the p90 of organic spend until the reset. The observed daily p90 is ≈ 2 units (p95 2.11, max 2.21), so roughly 2 units per remaining day are kept. |
+| About 2 units stay free for each remaining day | `reserve` is the p90 of human spend until the reset. The observed daily p90 is ≈ 2 units (p95 2.11, max 2.21), so roughly 2 units per remaining day are kept. |
 | The user's day is compensated at night | A heavy day lowers `R`, so the next plan puts less work into the following night; a light day raises it. |
 | The final day is used, not wasted | Near the reset the horizon is short, so `reserve` shrinks to what the user is likely to spend in those few hours. If the nowcast shows the user idle, those slots become cheap and the remainder is spent. |
 | No saturated 5-hour window at the start of a new week | The carry-over penalty discourages saturating a window that straddles the 7-day reset while the user may be active. |
@@ -98,7 +98,7 @@ Only the current slot of the plan is ever executed. Readings, the nowcast and th
 
 | Parameter | Meaning | Starting value |
 |---|---|---|
-| `q` | Quantile of organic spend kept in reserve: higher protects the user more, lower wastes less. May decrease near the reset, where 7-day blocking is mild. | 0.9 |
+| `q` | Quantile of human spend kept in reserve: higher protects the user more, lower wastes less. May decrease near the reset, where 7-day blocking is mild. | 0.9 |
 | `blocking_penalty` | Cost of interfering with an active user | TBD |
 | `carry_over_penalty` | Cost of a saturated window that runs past the 7-day reset | TBD |
 | Guard quantile | Share of the user's forecast spend protected in the current 5-hour window | 0.95 |
@@ -107,14 +107,14 @@ Only the current slot of the plan is ever executed. Readings, the nowcast and th
 
 ### 2.6 Cold start
 
-Until the profile has enough data, it is seeded with simple priors: user inactive between 00:00 and 10:00 local time, about 2 units of organic spend per day. The learned profile progressively replaces the priors.
+Until the profile has enough data, it is seeded with simple priors: user inactive between 00:00 and 10:00 local time, about 2 units of human spend per day. The learned profile progressively replaces the priors.
 
 ### 2.7 Open points
 
 - Hour-level profiles rest on a few weeks of data (about 4 examples per hour of the week), hence the pooling.
 - The heaviest observed days (≈ 2.1–2.2 units) may have been capped by the quota itself, so the true demand on such days is unknown.
 - The achievable burn rate per agent is unknown until the system runs.
-- Codex usage from other clients (cloud, IDE, ChatGPT app) is invisible locally, so its profile underestimates organic usage.
+- Codex usage from other clients (cloud, IDE, ChatGPT app) is invisible locally, so its profile underestimates human usage.
 
 ---
 
