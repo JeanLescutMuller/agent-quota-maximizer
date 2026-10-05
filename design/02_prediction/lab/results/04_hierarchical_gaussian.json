@@ -1,0 +1,95 @@
+{
+ "name": "04_hierarchical_gaussian",
+ "config": {
+  "kind": "gaussian_ridge",
+  "per_horizon": {
+   "30": {
+    "alpha": 1000.0,
+    "sigma_per_state": true,
+    "z": 0.5
+   },
+   "60": {
+    "alpha": 1000.0,
+    "sigma_per_state": true,
+    "z": 0.5
+   },
+   "120": {
+    "alpha": 1000.0,
+    "sigma_per_state": true,
+    "z": 0.5
+   },
+   "180": {
+    "alpha": 1000.0,
+    "sigma_per_state": true,
+    "z": 0.5
+   },
+   "300": {
+    "alpha": 1000.0,
+    "sigma_per_state": true,
+    "z": 0.5
+   }
+  }
+ },
+ "validation": [
+  {
+   "model": "hierarchical gaussian",
+   "n": 2355,
+   "pinball": 0.37286488746420765,
+   "coverage": 97.19745222929936,
+   "stolen": 0.1391907302823429,
+   "wasted": 0.11578953060437505,
+   "mean_pred": 4.56108874725831,
+   "actual_p95": 5.0,
+   "cost_usd": 0.48246298669689736,
+   "N": 30
+  },
+  {
+   "model": "hierarchical gaussian",
+   "n": 2355,
+   "pinball": 0.6760067693845769,
+   "coverage": 95.92356687898089,
+   "stolen": 0.3357484058575796,
+   "wasted": 0.6226008584205702,
+   "mean_pred": 7.862747688244612,
+   "actual_p95": 9.299999999999727,
+   "cost_usd": 1.2736271734388371,
+   "N": 60
+  },
+  {
+   "model": "hierarchical gaussian",
+   "n": 2355,
+   "pinball": 1.292306268418588,
+   "coverage": 94.81953290870489,
+   "stolen": 0.7872466997763818,
+   "wasted": 2.9796412119537004,
+   "mean_pred": 12.601217525000894,
+   "actual_p95": 19.0,
+   "cost_usd": 3.472674627109606,
+   "N": 120
+  },
+  {
+   "model": "hierarchical gaussian",
+   "n": 2355,
+   "pinball": 1.8535487838719884,
+   "coverage": 93.41825902335457,
+   "stolen": 1.2372872116372131,
+   "wasted": 5.530962699621303,
+   "mean_pred": 16.20421164964604,
+   "actual_p95": 27.299999999999727,
+   "cost_usd": 5.729227141117899,
+   "N": 180
+  },
+  {
+   "model": "hierarchical gaussian",
+   "n": 2355,
+   "pinball": 2.5772752223462625,
+   "coverage": 91.93205944798302,
+   "stolen": 1.7937606231013963,
+   "wasted": 10.206698141433733,
+   "mean_pred": 22.661894353407796,
+   "actual_p95": 47.0,
+   "cost_usd": 9.006177399183263,
+   "N": 300
+  }
+ ]
+}

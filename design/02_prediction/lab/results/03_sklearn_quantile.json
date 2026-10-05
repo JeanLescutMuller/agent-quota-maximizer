@@ -1,0 +1,100 @@
+{
+ "name": "03_sklearn_quantile",
+ "config": {
+  "kind": "hist_quantile",
+  "per_horizon": {
+   "30": {
+    "q": 0.909,
+    "max_depth": 3,
+    "max_iter": 200,
+    "learning_rate": 0.05
+   },
+   "60": {
+    "q": 0.85,
+    "max_depth": 3,
+    "max_iter": 200,
+    "learning_rate": 0.05
+   },
+   "120": {
+    "q": 0.95,
+    "max_depth": 10,
+    "max_iter": 400,
+    "learning_rate": 0.05
+   },
+   "180": {
+    "q": 0.85,
+    "max_depth": 6,
+    "max_iter": 400,
+    "learning_rate": 0.05
+   },
+   "300": {
+    "q": 0.85,
+    "max_depth": 6,
+    "max_iter": 400,
+    "learning_rate": 0.05
+   }
+  }
+ },
+ "validation": [
+  {
+   "model": "sklearn quantile",
+   "n": 2355,
+   "pinball": 0.5514951021945959,
+   "coverage": 91.63481953290871,
+   "stolen": 0.1140600931143001,
+   "wasted": 0.2562945777542682,
+   "mean_pred": 0.9219485892492263,
+   "actual_p95": 5.0,
+   "cost_usd": 0.44700656284712614,
+   "N": 30
+  },
+  {
+   "model": "sklearn quantile",
+   "n": 2355,
+   "pinball": 1.1188188082164863,
+   "coverage": 87.21868365180467,
+   "stolen": 0.47365555291708633,
+   "wasted": 0.10123478382815972,
+   "mean_pred": 0.6679234250212405,
+   "actual_p95": 9.299999999999727,
+   "cost_usd": 1.5480929001596873,
+   "N": 60
+  },
+  {
+   "model": "sklearn quantile",
+   "n": 2355,
+   "pinball": 1.0590114977638065,
+   "coverage": 94.64968152866243,
+   "stolen": 0.5449579275272736,
+   "wasted": 4.258099917712651,
+   "mean_pred": 12.179187951266883,
+   "actual_p95": 19.0,
+   "cost_usd": 3.1064573417553243,
+   "N": 120
+  },
+  {
+   "model": "sklearn quantile",
+   "n": 2355,
+   "pinball": 1.6356557616272234,
+   "coverage": 91.67728237791933,
+   "stolen": 1.0101952808100114,
+   "wasted": 6.02474046295972,
+   "mean_pred": 13.775165331378485,
+   "actual_p95": 27.299999999999727,
+   "cost_usd": 5.160541846739147,
+   "N": 180
+  },
+  {
+   "model": "sklearn quantile",
+   "n": 2355,
+   "pinball": 2.426088667650885,
+   "coverage": 87.38853503184714,
+   "stolen": 1.3712105501094527,
+   "wasted": 9.734144982255724,
+   "mean_pred": 19.730238993239197,
+   "actual_p95": 47.0,
+   "cost_usd": 7.50280015467208,
+   "N": 300
+  }
+ ]
+}

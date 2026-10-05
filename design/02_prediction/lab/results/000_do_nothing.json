@@ -1,0 +1,85 @@
+{
+ "name": "000_do_nothing",
+ "config": {
+  "kind": "constant",
+  "per_horizon": {
+   "30": {
+    "pct": 100.0
+   },
+   "60": {
+    "pct": 100.0
+   },
+   "120": {
+    "pct": 100.0
+   },
+   "180": {
+    "pct": 100.0
+   },
+   "300": {
+    "pct": 100.0
+   }
+  }
+ },
+ "validation": [
+  {
+   "model": "do nothing",
+   "n": 2355,
+   "pinball": 4.964585987261151,
+   "coverage": 100.0,
+   "stolen": 0.0,
+   "wasted": 89.83779193205945,
+   "mean_pred": 100.0,
+   "actual_p95": 5.0,
+   "cost_usd": 28.748093418259025,
+   "N": 30
+  },
+  {
+   "model": "do nothing",
+   "n": 2355,
+   "pinball": 4.929171974522297,
+   "coverage": 100.0,
+   "stolen": 0.0,
+   "wasted": 89.43821656050956,
+   "mean_pred": 100.0,
+   "actual_p95": 9.299999999999727,
+   "cost_usd": 28.62022929936306,
+   "N": 60
+  },
+  {
+   "model": "do nothing",
+   "n": 2355,
+   "pinball": 4.858343949044591,
+   "coverage": 100.0,
+   "stolen": 0.0,
+   "wasted": 88.49426751592357,
+   "mean_pred": 100.0,
+   "actual_p95": 19.0,
+   "cost_usd": 28.318165605095544,
+   "N": 120
+  },
+  {
+   "model": "do nothing",
+   "n": 2355,
+   "pinball": 4.787515923566883,
+   "coverage": 100.0,
+   "stolen": 0.0,
+   "wasted": 87.47898089171974,
+   "mean_pred": 100.0,
+   "actual_p95": 27.299999999999727,
+   "cost_usd": 27.99327388535032,
+   "N": 180
+  },
+  {
+   "model": "do nothing",
+   "n": 2355,
+   "pinball": 4.64585987261147,
+   "coverage": 100.0,
+   "stolen": 0.0,
+   "wasted": 85.39193205944798,
+   "mean_pred": 100.0,
+   "actual_p95": 47.0,
+   "cost_usd": 27.325418259023355,
+   "N": 300
+  }
+ ]
+}

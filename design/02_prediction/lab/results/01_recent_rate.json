@@ -1,0 +1,90 @@
+{
+ "name": "01_recent_rate",
+ "config": {
+  "kind": "recent_rate",
+  "per_horizon": {
+   "30": {
+    "lookback": 120,
+    "multiplier": 2.0
+   },
+   "60": {
+    "lookback": 30,
+    "multiplier": 2.0
+   },
+   "120": {
+    "lookback": 60,
+    "multiplier": 3.0
+   },
+   "180": {
+    "lookback": 30,
+    "multiplier": 5.0
+   },
+   "300": {
+    "lookback": 30,
+    "multiplier": 5.0
+   }
+  }
+ },
+ "validation": [
+  {
+   "model": "recent-rate",
+   "n": 2355,
+   "pinball": 0.32861995753715506,
+   "coverage": 95.07430997876858,
+   "stolen": 0.10169851380042463,
+   "wasted": 0.3934182590233546,
+   "mean_pred": 1.41656050955414,
+   "actual_p95": 5.0,
+   "cost_usd": 0.4513290870488323,
+   "N": 30
+  },
+  {
+   "model": "recent-rate",
+   "n": 2355,
+   "pinball": 0.6132484076433122,
+   "coverage": 91.84713375796179,
+   "stolen": 0.19787685774946923,
+   "wasted": 1.338004246284501,
+   "mean_pred": 2.6157112526539277,
+   "actual_p95": 9.299999999999727,
+   "cost_usd": 1.0613673036093418,
+   "N": 60
+  },
+  {
+   "model": "recent-rate",
+   "n": 2355,
+   "pinball": 1.127430997876858,
+   "coverage": 88.9171974522293,
+   "stolen": 0.3273885350318471,
+   "wasted": 4.118471337579618,
+   "mean_pred": 6.63864118895966,
+   "actual_p95": 19.0,
+   "cost_usd": 2.3655541401273887,
+   "N": 120
+  },
+  {
+   "model": "recent-rate",
+   "n": 2355,
+   "pinball": 2.160764331210191,
+   "coverage": 84.45859872611466,
+   "stolen": 0.8772823779193206,
+   "wasted": 5.876433121019108,
+   "mean_pred": 8.543524416135881,
+   "actual_p95": 27.299999999999727,
+   "cost_usd": 4.687762208067941,
+   "N": 180
+  },
+  {
+   "model": "recent-rate",
+   "n": 2355,
+   "pinball": 4.352229299363057,
+   "coverage": 77.0276008492569,
+   "stolen": 2.429723991507431,
+   "wasted": 6.416135881104034,
+   "mean_pred": 9.617834394904458,
+   "actual_p95": 47.0,
+   "cost_usd": 9.82828025477707,
+   "N": 300
+  }
+ ]
+}
