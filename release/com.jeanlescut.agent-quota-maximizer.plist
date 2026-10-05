@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jeanlescut.agent-quota-maximizer</string>
+
+    <!-- The system Python on purpose: standard library only, so the job cannot
+         break when a Conda environment moves or is rebuilt. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/jeanlescut/opt/agent-quota-maximizer/aqm.py</string>
+        <string>pipeline</string>
+    </array>
+
+    <!-- One tick every 5 minutes. The meter has 1% resolution and the decision is
+         cheap, so shorter would add nothing; longer would blunt the late start
+         that keeps this system out of the user's way. A tick is ~45 ms of wall
+         clock, of which ~39 ms is the interpreter starting: about 18 seconds of
+         CPU a day, a duty cycle of 0.02%. -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <!-- Tick immediately at login and on every re-bootstrap. This does NOT cover
+         sleep: StartInterval does not fire while the Mac is asleep, though launchd
+         fires once on wake. Every tick re-plans from live readings, so a missed
+         tick costs an opportunity, never correctness. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jeanlescut/opt/agent-quota-maximizer/logs/pipeline.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jeanlescut/opt/agent-quota-maximizer/logs/pipeline.err</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

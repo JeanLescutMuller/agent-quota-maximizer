@@ -1,0 +1,11 @@
+{
+  "_comment": "Written by install.sh if no config.json exists, and never overwritten afterwards. Flip `enabled` to turn the system on and off: the pipeline re-reads this file every tick. Every key under `parameters` overrides design/07_pipeline/DESIGN.md section 11; an unknown key there is a hard error, so a typo cannot silently disable a safety limit.",
+  "enabled": false,
+  "disabled_reason": "fresh install: set enabled to true when the repo list is right",
+  "agents": ["claude", "codex"],
+  "repos": [],
+  "excluded_repos": [],
+  "categories": {"bugs": 1.0, "agent-docs": 0.5, "tests": 0.5},
+  "models": {"cheap": "haiku", "default": "sonnet", "expensive": "opus"},
+  "parameters": {}
+}
