@@ -136,7 +136,7 @@ The two numbers the executor is ultimately launched with, `extra_quota_to_spend_
 
 `remaining_windows` is not called *future* windows: entry `[0]` is normally the window already running, and `is_open_now` is true for it and for no other (`../VOCABULARY.md` §5).
 
-**Each window carries its own working** — `human_reserve_pct`, `max_spend_units_by_quota`, `max_spend_units_by_time` and which of the two `limited_by` — so "why was this window's ceiling 0.85?" is answerable from the file, with no rerun and no reimplementation of §2. That matters beyond convenience: the notebook that visualises a decision (`../../notebook/README.md`) displays these fields rather than recomputing them, because a second copy of the formula is the copy a human would end up trusting.
+**Each window carries its own working** — `human_reserve_pct`, `max_spend_units_by_quota`, `max_spend_units_by_time` and which of the two `limited_by` — so "why was this window's ceiling 0.85?" is answerable from the file, with no rerun and no reimplementation of §2. That matters beyond convenience: the notebook that visualises a decision (`../../lab/README.md`) displays these fields rather than recomputing them, because a second copy of the formula is the copy a human would end up trusting.
 
 `aqm budget` prints exactly the table a human would draw (`--json` gives the same content for a script). The same real tick as above:
 

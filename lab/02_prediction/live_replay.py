@@ -16,7 +16,7 @@ The target has to match what the live stage actually claims, which is not a fixe
 horizon: it is the human's burn between `now` and **this window's** end, whatever that
 happens to be. So the horizon is read per anchor from the slot grid rather than chosen.
 
-    /opt/anaconda3/bin/python design/02_prediction/lab/live_replay.py
+    /opt/anaconda3/bin/python lab/02_prediction/live_replay.py
 """
 import sys
 import pathlib

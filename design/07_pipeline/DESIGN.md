@@ -357,10 +357,10 @@ the pipeline. Both are generic and both moved to `io`.
 - **`P` and `CONFIG` are mutated, never rebound.** `load_config` does `P[key] = value`,
   so `from .core import P` binds the one dict and a notebook patching `aqm.P` still
   reaches the stage it is testing — which is exactly what
-  `design/02_prediction/lab/live_replay.py` relies on. A module that ever writes
+  `lab/02_prediction/live_replay.py` relies on. A module that ever writes
   `P = {...}` breaks every caller silently, so `test_imports.sh` asserts the sharing.
 - **`import aqm` keeps its flat surface.** `__init__.py` re-exports every public name,
-  because `test/`, `design/02_prediction/lab/` and `notebook/` all reach for
+  because `test/` and `lab/` both reach for
   `aqm.predict_agent`, `aqm.read_csv`, `aqm.P` and twenty others.
 - **The shebang stays `#!/usr/bin/python3`**, not `env python3`, for the reason §9
   gives: the symlink on `PATH` must not inherit a Conda interpreter.

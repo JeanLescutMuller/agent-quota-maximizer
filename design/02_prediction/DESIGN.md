@@ -174,8 +174,8 @@ No network, no subprocess, no model call — the word "prediction" here means ar
 ## 8. What the forecasting study established (2026-10-05)
 
 Five candidate engines were built and compared on 42 days of recorded history, one
-notebook each in this folder, all measured on the same rows, the same three-way split
-and the same objective (`lab/README.md`). **The conclusion was to change nothing in
+notebook each in `../../lab/02_prediction/`, all measured on the same rows, the same three-way split
+and the same objective (`../../lab/02_prediction/README.md`). **The conclusion was to change nothing in
 this stage** — and that is a result, not an absence of one.
 
 ### The objective was money, which derives the quantile
@@ -212,7 +212,7 @@ and 3:1, the lookup table at 10:1, this stage at 30:1, and **doing nothing wins 
 `01_baseline_recent_rate.ipynb` tunes a *simplification* of this stage: one look-back,
 extrapolated, times a multiplier. It preferred `multiplier = 5.0`. But this stage takes
 `max(recent rate, window-average rate)` and then the active-human floor, so its rate is
-already the larger of two arms. `lab/live_replay.py` calls `predict_agent()` itself over
+already the larger of two arms. `../../lab/02_prediction/live_replay.py` calls `predict_agent()` itself over
 the same test period, with `aqm.P` patched, and found:
 
 | | cost | vs today |
@@ -254,7 +254,7 @@ not a sixth model.
 
 ## 9. Parked on 2026-10-06, and what would bring it back
 
-**Why it is parked.** The study of §8 scored forecasters on their own, against every tick. Scoring the whole decision instead — budget, a just-in-time start, a bot burning quota, replayed over the 42 recorded days (`../../notebook/pipeline_replay.py`) — showed where a forecast can matter at all:
+**Why it is parked.** The study of §8 scored forecasters on their own, against every tick. Scoring the whole decision instead — budget, a just-in-time start, a bot burning quota, replayed over the 42 recorded days (`../../lab/07_pipeline/pipeline_replay.py`) — showed where a forecast can matter at all:
 
 | | Claude | Codex |
 |---|---|---|
@@ -275,5 +275,5 @@ P4 measures the bot's burn rate, per agent, with 1, 2 and 3 parallel workers
 
 What a returning forecast would need to predict is no longer "the rest of the current window from now", but the user's demand **over the bot's lead time**, starting from a moment when they are idle — the case where the study of §8 found today's engine weakest (`idle`/morning).
 
-**What stays.** The bench (`lab/`, the notebooks of this folder), `aqm predict` as a command for analysis, and this document. What leaves the tick: the prediction artifact, its staleness check in budget, and the five parameters listed in `../07_pipeline/DESIGN.md` §11.
+**What stays.** The bench (`../../lab/02_prediction/`, its dataset and its notebooks), `aqm predict` as a command for analysis, and this document. What leaves the tick: the prediction artifact, its staleness check in budget, and the five parameters listed in `../07_pipeline/DESIGN.md` §11.
 

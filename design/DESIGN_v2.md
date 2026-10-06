@@ -106,7 +106,7 @@ Each stage keeps its own open points at the end of its DESIGN.md. The ones that 
 
 ## 8. Decisions of 2026-10-06: no forecast, the VM, fewer parameters
 
-A review of stages 1–3 replayed the **whole decision** — budget, a just-in-time start, a bot burning quota — over the 42 recorded days of real human usage, instead of scoring one stage on its own. Every figure below comes from `../notebook/pipeline_replay.py` (`/usr/bin/python3 notebook/pipeline_replay.py`, about 10 seconds). This section is the index of what changed and why; each rule is stated in the document that owns it.
+A review of stages 1–3 replayed the **whole decision** — budget, a just-in-time start, a bot burning quota — over the 42 recorded days of real human usage, instead of scoring one stage on its own. Every figure below comes from `../lab/07_pipeline/pipeline_replay.py` (`/usr/bin/python3 lab/07_pipeline/pipeline_replay.py`, about 10 seconds). This section is the index of what changed and why; each rule is stated in the document that owns it.
 
 | Decision | Why, in one line | Rule stated in |
 |---|---|---|

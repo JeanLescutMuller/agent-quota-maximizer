@@ -3,9 +3,9 @@
 recorded human usage, and measure what the user actually cares about: waste left at
 each weekly reset, and how often the bot made the user wait at a full 5-hour window.
 
-    /usr/bin/python3 notebook/pipeline_replay.py            # every table, ~20 s
+    /usr/bin/python3 lab/07_pipeline/pipeline_replay.py     # every table, ~20 s
 
-Why this exists next to `design/02_prediction/lab/`: the lab scores a forecaster on its
+Why this exists beside `lab/02_prediction/`: that bench scores a forecaster on its
 own, on every tick. This scores the *pipeline*, so a forecast only counts where it
 changes what the bot does. Written for the 2026-10-05 review of stages 1-3.
 

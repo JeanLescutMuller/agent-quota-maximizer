@@ -306,7 +306,7 @@ decision itself, and all four are needed downstream or for audit.
 
 | | |
 |---|---|
-| The notebook must not reimplement the formula | it reads these fields instead of redoing the arithmetic. A second copy would eventually disagree, and the copy is the one a human reads (`../notebook/README.md`) |
+| The notebook must not reimplement the formula | it reads these fields instead of redoing the arithmetic. A second copy would eventually disagree, and the copy is the one a human reads (`../lab/README.md`) |
 | `limited_by` is meaningless without them | it answers *"was the bot short of quota, or short of time?"* |
 | Audit | *"why 0.27 units at 03:12 last Tuesday?"* must be answerable from one file, with no rerun |
 | It is the measurement that validates `BOT_BURN_UNITS_PER_HOUR`, currently a guess | if `limited_by` says `time` most of the time, our own burn rate is the bottleneck rather than the user's quota -- the number P4 has to measure |

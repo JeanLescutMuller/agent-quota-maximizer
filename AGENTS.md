@@ -11,10 +11,10 @@ Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the w
 | Path | Contents |
 |---|---|
 | `AGENTS.md` / `CLAUDE.md` | This file — the entry point. `CLAUDE.md` is a symlink to it |
-| [`design/`](design/) | Every design document, plus `PIPELINE_MAP.html`, the visual summary. No code, with one exception: [`02_prediction/`](design/02_prediction/lab/README.md) holds the forecasting bench — one notebook per candidate forecaster and the shared dataset they are all measured on, which belong beside the design question they investigate |
+| [`design/`](design/) | Every design document, plus `PIPELINE_MAP.html`, the visual summary. No code |
 | [`release/`](release/) | The implementation and what gets deployed: the `aqm/` package (one module per stage), the `aqm-cli` launcher, `install.sh`, `uninstall.sh`, the LaunchAgent plist, the `config.json` template |
 | [`test/`](test/) | Every test. Bash only, hermetic, no LLM is ever called ([`README`](test/README.md)) |
-| [`notebook/`](notebook/) | Ad-hoc analysis, run by hand. **`explain_budget.ipynb` takes one decision apart**, measurement by measurement; **`pipeline_replay.py` replays the whole decision** over the recorded history ([`README`](notebook/README.md)) |
+| [`lab/`](lab/README.md) | Ad-hoc analysis, run by hand, one folder per stage it studies. **`02_prediction/`** is the forecasting bench, one notebook per candidate forecaster; **`03_budgeting/explain_budget.ipynb` takes one decision apart**, measurement by measurement; **`07_pipeline/pipeline_replay.py` replays the whole decision** over the recorded history. `release/` never imports it |
 
 Four commands are runnable now:
 
@@ -77,7 +77,7 @@ aqm pipeline
 ```
 
 **To see *why* a decision came out the way it did**, open
-[`notebook/explain_budget.ipynb`](notebook/README.md): it walks one decision from
+[`lab/03_budgeting/explain_budget.ipynb`](lab/README.md): it walks one decision from
 the meter readings through the forecast to `extra_quota_to_spend_units`, showing every intermediate
 value, and its last section replays two days of decisions so the behaviour over time
 is visible rather than inferred.

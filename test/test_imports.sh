@@ -93,7 +93,7 @@ section "core stays a leaf, so no cycle can form"
 is "core.py imports nothing from the package" \
    "$(grep -cE '^from \.[a-z]' "$PKG/core.py")" "0"
 
-section "the package keeps the flat surface lab/ and notebook/ import"
+section "the package keeps the flat surface test/ and lab/ import"
 FLAT="$("$PY" -c "
 import sys; sys.path.insert(0, '$REPO/release')
 import aqm
@@ -134,5 +134,74 @@ is "aqm-cli names the interpreter in full" \
 section "the monolith is gone, so there is one copy of every stage"
 is "release/aqm.py no longer exists" \
    "$([ -e "$REPO/release/aqm.py" ] && echo present || echo absent)" "absent"
+
+section "release/ never imports lab/; lab/ gets aqm only from release/"
+# ../lab/README.md: the layering above, pointed outward. Parsed for the same reason as
+# the budget test: a comment citing `../lab/...` as evidence is documentation, while an
+# import or a path string is how release/ would come to depend on run-by-hand code.
+OUT="$("$PY" - "$REPO" <<'PY'
+import ast, pathlib, re, sys
+repo = pathlib.Path(sys.argv[1]).resolve()
+
+def code_strings(tree):
+    docs = {id(n.body[0].value) for n in ast.walk(tree)
+            if isinstance(n, (ast.Module, ast.FunctionDef, ast.ClassDef))
+            and ast.get_docstring(n)}
+    return [n.value for n in ast.walk(tree)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs]
+
+def imported(tree):
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            yield from (a.name.split(".")[0] for a in n.names)
+        elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+            yield n.module.split(".")[0]
+
+for f in sorted((repo / "release").rglob("*.py")) + [repo / "release" / "aqm-cli"]:
+    tree = ast.parse(f.read_text())
+    name = f.relative_to(repo)
+    if "lab" in imported(tree):
+        print("bad %s imports lab" % name)
+    if any(re.search(r"(^|/)lab(/|$)", s) for s in code_strings(tree)):
+        print("bad %s builds a path into lab/" % name)
+
+def repo_of(f):
+    """Evaluate the file's own `REPO = ...` line, so an off-by-one parents[N] shows."""
+    for n in ast.walk(ast.parse(f.read_text())):
+        if isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "REPO" for t in n.targets):
+            return eval(compile(ast.Expression(n.value), str(f), "eval"),
+                        {"pathlib": pathlib, "__file__": str(f)})
+
+checked = 0
+for f in sorted((repo / "lab").rglob("*.py")):
+    tree = ast.parse(f.read_text())
+    mods = list(imported(tree))
+    if "aqm" not in mods:
+        continue
+    checked += 1
+    # the file puts release/ on the path itself, or a sibling it imports does
+    supplier = next((g for g in [f] + [f.with_name(m + ".py") for m in mods]
+                     if g.exists() and 'REPO / "release"' in g.read_text()), None)
+    if supplier is None:
+        print("bad %s imports aqm without putting release/ on the path" % f.relative_to(repo))
+    elif repo_of(supplier) != repo:
+        print("bad %s: REPO in %s resolves to %s, not the repo root"
+              % (f.relative_to(repo), supplier.name, repo_of(supplier)))
+    else:
+        print("ok %s gets aqm from release/" % f.relative_to(repo))
+print("checked %d" % checked)
+PY
+)"
+while read -r verdict msg; do
+    case "$verdict" in
+        ok)      ok "$msg" ;;
+        bad)     bad "$msg" ;;
+        checked) [ "$msg" -gt 0 ] && ok "$msg lab/ files import aqm, all checked" \
+                                  || bad "no lab/ file imports aqm -- the check found nothing to check" ;;
+        *)       bad "unexpected output: $verdict $msg" ;;
+    esac
+done <<< "$OUT"
+is "release/ never imports or points into lab/" \
+   "$(grep -c '^bad release/' <<< "$OUT")" "0"
 
 finish

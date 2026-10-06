@@ -55,11 +55,11 @@ def state_dir() -> pathlib.Path:
 
 P = {
     # Measured, not chosen: replaying this engine over the 8-day held-out period in
-    # `../design/02_prediction/lab/live_replay.py`, the forecast is exactly 0 on 73.6%
+    # `../lab/02_prediction/live_replay.py`, the forecast is exactly 0 on 73.6%
     # of ticks, and on those the human's demand to the window's end has a 90.9th
     # percentile of 26%. So on three ticks in four this floor is the *only* protection
     # the user has, and 10 was far too low: 25 costs 9.1% less under the cost model in
-    # `../design/02_prediction/lab/README.md`. It also settles the GUARD_PCT conflict,
+    # `../lab/02_prediction/README.md`. It also settles the GUARD_PCT conflict,
     # since 25 >= 15 (`../design/03_budgeting/DESIGN.md` 9).
     "MIN_HUMAN_RESERVE_PCT": 25.0,          # pct of a window never offered to the bot
     "WINDOW_GAP_SECONDS": 300,              # assumed gap between consecutive windows

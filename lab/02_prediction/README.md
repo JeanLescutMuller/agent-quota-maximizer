@@ -1,26 +1,26 @@
-# lab/ — the forecasting bench
+# lab/02_prediction/ — the forecasting bench
 
-One notebook per candidate forecaster in `../`, all measured on the same rows, the
+One notebook per candidate forecaster in this folder, all measured on the same rows, the
 same split and the same metrics, so the comparison means something.
 
 ```bash
-/opt/anaconda3/bin/jupyter lab design/02_prediction/
+/opt/anaconda3/bin/jupyter lab lab/02_prediction/
 ```
 
 | File | What it is |
 |---|---|
 | `dataset.py` | **The bench.** Features, the three-way split, the metrics, the cell breakdown. Every notebook imports it and none of them redefines any of it |
 | `results/*.json` | One per approach: the configuration it froze, and the validation numbers that chose it |
-| `live_replay.py` | **Replays the real stage**, calling `aqm.predict_agent()` with `aqm.P` patched. Any change to `BURN_LOOKBACK_MINUTES` or `SAFETY_MULTIPLIER` must be justified here, not in a notebook: the notebooks tune a simplification that omits the window-average arm, so they will keep asking for a bigger multiplier than this engine needs (`../DESIGN.md` §8) |
+| `live_replay.py` | **Replays the real stage**, calling `aqm.predict_agent()` with `aqm.P` patched. Any change to `BURN_LOOKBACK_MINUTES` or `SAFETY_MULTIPLIER` must be justified here, not in a notebook: the notebooks tune a simplification that omits the window-average arm, so they will keep asking for a bigger multiplier than this engine needs (`../../design/02_prediction/DESIGN.md` §8) |
 
 | Notebook | Approach |
 |---|---|
-| `../00_constant_reserve.ipynb` | One tuned number, ignoring everything. The null hypothesis every approach must beat |
-| `../01_baseline_recent_rate.ipynb` | What the stage does today: one recent rate, extrapolated, times a multiplier |
-| `../02_state_clock_table.ipynb` | Empirical p95 per (state × clock band) — a lookup, no model |
-| `../03_sklearn_quantile.ipynb` | Gradient boosting with `loss="quantile"`, so the p95 is predicted directly |
-| `../04_hierarchical_bayes.ipynb` | Smooth priors over day-of-week and time-of-day, recent usage as the shift, residual spread as the quantile |
-| `../05_comparison.ipynb` | **The only notebook that reads the test set** |
+| `00_constant_reserve.ipynb` | One tuned number, ignoring everything. The null hypothesis every approach must beat |
+| `01_baseline_recent_rate.ipynb` | What the stage does today: one recent rate, extrapolated, times a multiplier |
+| `02_state_clock_table.ipynb` | Empirical p95 per (state × clock band) — a lookup, no model |
+| `03_sklearn_quantile.ipynb` | Gradient boosting with `loss="quantile"`, so the p95 is predicted directly |
+| `04_hierarchical_bayes.ipynb` | Smooth priors over day-of-week and time-of-day, recent usage as the shift, residual spread as the quantile |
+| `05_comparison.ipynb` | **The only notebook that reads the test set** |
 
 ## The protocol
 
@@ -48,7 +48,7 @@ Three rules, and breaking any one of them invalidates the study:
 
 ## What is being predicted
 
-Exactly what the stage promises (`../DESIGN.md` §1.1): the p95 of human burn, in
+Exactly what the stage promises (`../../design/02_prediction/DESIGN.md` §1.1): the p95 of human burn, in
 percent of a 5-hour meter, from now to the end of the current window. The window
 contributes one number, `N`, the minutes it has left — so each approach is fitted at
 `N` ∈ {30, 60, 120, 180, 300} and nothing in the feature set knows a window exists.
@@ -116,7 +116,7 @@ They pull in opposite directions, and the aggregate metrics hide both.
 ## Nothing here ships as-is
 
 `release/aqm/` is standard library only, so the tick cannot import sklearn
-(`../../07_pipeline/DESIGN.md` §1). A winning approach has to leave as something
+(`../../design/07_pipeline/DESIGN.md` §1). A winning approach has to leave as something
 stdlib can evaluate:
 
 | Approach | Exports to | Feasible in a tick |

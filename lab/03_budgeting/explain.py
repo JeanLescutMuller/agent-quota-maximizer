@@ -22,7 +22,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-REPO = pathlib.Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent.parent
 
 # matplotlib formats dates in rcParams["timezone"], which is UTC by default, while
 # every timestamp here is local. Left alone, a 13:53 peak is labelled 11:53 and

@@ -1,11 +1,11 @@
 """The shared bench every candidate forecaster is measured on.
 
-One module, imported by every notebook in `../`, so that no two approaches can
+One module, imported by every notebook in this folder, so that no two approaches can
 accidentally be scored on different rows, a different split or a different metric.
 Nothing here is imported by `release/`: this is investigation, and the package stays
-standard-library only (`../../07_pipeline/DESIGN.md` §1).
+standard-library only (`../../design/07_pipeline/DESIGN.md` §1).
 
-What is being predicted is fixed by the stage's specification (`../DESIGN.md` §1.1):
+What is being predicted is fixed by the stage's specification (`../../design/02_prediction/DESIGN.md` §1.1):
 **the p95 of human burn, in percent of a 5-hour meter, between now and the end of the
 current window.** The window contributes exactly one thing, `N`, the minutes it
 happens to have left, so every model here answers at five values of `N` and nothing
@@ -93,7 +93,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-REPO = pathlib.Path(__file__).resolve().parents[3]
+REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "release"))
 import aqm                                                  # noqa: E402
 
@@ -119,7 +119,7 @@ def build(agent="claude") -> pd.DataFrame:
     rows = aqm.read_csv(aqm.slots_path(agent), aqm.SLOT_TYPES)
     start = np.array([int(r["slot_id"].split("_")[0]) for r in rows])
     # A censored slot's upper bound is the conservative reading, the same choice the
-    # live stage makes (`../../01_ingestion/DESIGN.md` §6.3).
+    # live stage makes (`../../design/01_ingestion/DESIGN.md` §6.3).
     burn = np.array([r["slot_window_human_pct_hi"] if r["slot_window_human_pct"] is None
                      else r["slot_window_human_pct"] for r in rows], dtype=float)
     active = np.array([1.0 if r["was_human_active"] else 0.0 for r in rows])
