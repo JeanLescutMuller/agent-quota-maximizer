@@ -1,0 +1,25 @@
+#!/usr/bin/python3
+"""The one executable file; everything else is the `aqm` package beside it.
+
+`~/.local/bin/aqm` symlinks here, so `realpath` is what finds the package: the
+symlink's own directory is `~/.local/bin`, which holds no code (see ~/AGENTS.md).
+
+The shebang names the interpreter in full rather than going through `env`, for the
+reason ../design/07_pipeline/DESIGN.md gives: the symlink on PATH must not inherit
+whichever `python3` a Conda environment happens to put first.
+
+Equivalent, for a checkout or a notebook:
+
+    python3 release/aqm-cli pipeline
+    python3 release/aqm      pipeline      # the package directory, via __main__.py
+    python3 -m aqm           pipeline      # with release/ on sys.path
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from aqm.cli import main                                            # noqa: E402
+
+if __name__ == "__main__":
+    sys.exit(main())

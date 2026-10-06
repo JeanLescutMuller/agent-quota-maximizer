@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs every test/test_*.sh and aggregates the result.
 #   bash test/run.sh                 everything
-#   bash test/test_buckets.sh        one file, independently runnable
+#   bash test/test_slots.sh          one file, independently runnable
 #
 # Hermetic except test_real_data.sh, which reads the recorded history read-only
 # and skips itself when agent-usage-tracker is not deployed. Nothing writes

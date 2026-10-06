@@ -249,7 +249,7 @@ Each stage owns its own tests (see its DESIGN.md). Across stages:
 
 Status: **the LaunchAgent, `install.sh`, `uninstall.sh`, the plist and the config template are built; stages 4 and 6 are not, so a tick ends at `budget` and nothing can act.**
 
-`release/install.sh` **[built 2026-10-04]**: copy `aqm.py` and the plist into `~/opt/agent-quota-maximizer/`, create `logs/`, `state/locks/`, `state/latest/`, `artifacts/` and `reports/`, write `config.json` from `config.json.template` if none exists (`enabled: false`, empty repo list), symlink the plist into `~/Library/LaunchAgents/` and `aqm` into `~/.local/bin/`, then `launchctl bootout` + `bootstrap`, and finally run one tick to prove the deployed copy works. Idempotent, and it never overwrites an existing `config.json` or anything in `data/`, `state/`, `logs/` or `reports/`.
+`release/install.sh` **[built 2026-10-04]**: copy the `aqm/` package, `aqm-cli` and the plist into `~/opt/agent-quota-maximizer/`, create `logs/`, `state/locks/`, `state/latest/`, `artifacts/` and `reports/`, write `config.json` from `config.json.template` if none exists (`enabled: false`, empty repo list), symlink the plist into `~/Library/LaunchAgents/` and `aqm` into `~/.local/bin/`, then `launchctl bootout` + `bootstrap`, and finally run one tick to prove the deployed copy works. Idempotent, and it never overwrites an existing `config.json` or anything in `data/`, `state/`, `logs/` or `reports/`.
 
 **Both symlinks are symlinks, and the real files live in `~/opt/`** — the scheduler directory and `~/.local/bin` never hold a real file for a project deployed this way (`~/AGENTS.md`). `aqm.py` carries a `#!/usr/bin/python3` shebang rather than `env python3`, for the same reason the plist names the interpreter in full: the job must not break when a Conda environment moves, and the `~/.local/bin/aqm` symlink would otherwise inherit whatever `python3` happened to be first on `PATH`.
 
@@ -295,3 +295,79 @@ Development happens only in `~/dev/agent-quota-maximizer/release/` (`~/AGENTS.md
 | `ARTIFACT_RETENTION_DAYS`              | Prediction, budget and plan artifacts older than this are pruned                                                      | 14                |
 | `REPORT_RETENTION_DAYS`                | Reports older than this are deleted                                                                                   | 90                |
 | `LOG_MAX_MB`                           | Rotation threshold                                                                                                    | 20 MB             |
+
+## 12. Code layout: one module per stage
+
+**[split 2026-10-06]** `release/aqm.py` was one file of 1,383 lines. Stages 4–6 are the
+three largest still to write — execution alone needs a supervisor, a worker pool, repo
+locks and report scrubbing — so the monolith was split before they land rather than
+after.
+
+```
+release/
+├── aqm-cli              the ONE executable; ~/.local/bin/aqm symlinks to it
+└── aqm/
+    ├── __init__.py      re-exports every public name
+    ├── __main__.py      so `python3 release/aqm` and `python3 -m aqm` both work
+    ├── core.py          constants, paths, P, CONFIG                     125
+    ├── io.py            CSV columns and types, append/read/tail,
+    │                    artifacts, and the four formatters              246
+    ├── history.py       questions asked of the ingested table            85
+    ├── s1_ingest.py     stage 1                                         324
+    ├── s2_predict.py    stage 2                                         137
+    ├── s3_budget.py     stage 3                                         161
+    ├── s4_windows.py    stage 4   — P3 lands here
+    ├── s5_plan.py       stage 5   — P5
+    ├── s6_execute.py    stage 6   — P4
+    ├── plumbing.py      locks, logs, metrics, housekeeping                88
+    ├── pipeline.py      the stages in order                             133
+    └── cli.py           argparse and dispatch                            99
+```
+
+### 12.1 The layering, and why it is a test
+
+Each module may import only from the ones above it, and `test/test_imports.sh` asserts
+it by parsing the import statements:
+
+```
+  core          (imports nothing from the package — so no cycle can form)
+   └─ io
+       └─ history
+           ├─ s1_ingest   s2_predict   s3_budget   plumbing
+           └─────────────────── pipeline
+                                  └─ cli
+```
+
+The load-bearing line is that **`s3_budget` may not import `s2_predict`**. Budget's only
+interface with prediction is the artifact's two fields, and `internals` is invisible to
+it (`VOCABULARY.md` §4.2). That was previously enforced only on the JSON; it is now also
+impossible to express in code. The test parses rather than greps, because a docstring
+that *explains* the rule is documentation, not a breach of it.
+
+Splitting the file surfaced two genuine misfilings, both announced as import cycles:
+`read_all` (read any JSONL) sat under ingestion, and `clock` (format an epoch) sat under
+the pipeline. Both are generic and both moved to `io`.
+
+### 12.2 What the split must not change
+
+- **`P` and `CONFIG` are mutated, never rebound.** `load_config` does `P[key] = value`,
+  so `from .core import P` binds the one dict and a notebook patching `aqm.P` still
+  reaches the stage it is testing — which is exactly what
+  `design/02_prediction/lab/live_replay.py` relies on. A module that ever writes
+  `P = {...}` breaks every caller silently, so `test_imports.sh` asserts the sharing.
+- **`import aqm` keeps its flat surface.** `__init__.py` re-exports every public name,
+  because `test/`, `design/02_prediction/lab/` and `notebook/` all reach for
+  `aqm.predict_agent`, `aqm.read_csv`, `aqm.P` and twenty others.
+- **The shebang stays `#!/usr/bin/python3`**, not `env python3`, for the reason §9
+  gives: the symlink on `PATH` must not inherit a Conda interpreter.
+
+Acceptance was `predict` and `budget` producing byte-identical JSON and byte-identical
+tables to the monolith at five past moments, plus the suite — 211 assertions before,
+256 after.
+
+### 12.3 Deployment
+
+`install.sh` copies the package with `rsync -a --delete` rather than `install`, because
+a module deleted here must be deleted in `~/opt/` too: a stale module left behind is a
+module that still runs. `__pycache__` is excluded so the deployed tree never carries
+bytecode compiled against another interpreter.

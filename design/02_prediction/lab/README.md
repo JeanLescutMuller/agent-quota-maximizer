@@ -115,7 +115,7 @@ They pull in opposite directions, and the aggregate metrics hide both.
 
 ## Nothing here ships as-is
 
-`release/aqm.py` is standard library only, so the tick cannot import sklearn
+`release/aqm/` is standard library only, so the tick cannot import sklearn
 (`../../07_pipeline/DESIGN.md` §1). A winning approach has to leave as something
 stdlib can evaluate:
 

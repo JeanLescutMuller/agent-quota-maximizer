@@ -1,7 +1,7 @@
 #!/bin/bash
 # Deploy agent-quota-maximizer into ~/opt/ and schedule it.
 #
-# Idempotent: safe to re-run after every change to aqm.py. It never overwrites
+# Idempotent: safe to re-run after every change to the aqm package. It never overwrites
 # config.json, and never touches data/, state/, logs/ or reports/.
 #
 # Development happens here in ~/dev/agent-quota-maximizer (see ~/AGENTS.md);
@@ -20,7 +20,13 @@ echo "installing into $HOME_DIR"
 mkdir -p "$HOME_DIR" "$HOME_DIR/logs" "$HOME_DIR/state/locks" \
          "$HOME_DIR/state/latest" "$HOME_DIR/artifacts" "$HOME_DIR/reports"
 
-install -m 755 "$SRC/aqm.py" "$HOME_DIR/aqm.py"
+# The package, as a directory. rsync --delete so that a module deleted here is
+# deleted there too: a stale module left behind in ~/opt/ is a module that still
+# runs. __pycache__ is excluded because the deployed tree must not carry bytecode
+# compiled against a different interpreter.
+install -m 755 "$SRC/aqm-cli" "$HOME_DIR/aqm-cli"
+rsync -a --delete --exclude __pycache__ "$SRC/aqm/" "$HOME_DIR/aqm/"
+chmod 755 "$HOME_DIR/aqm"; chmod 644 "$HOME_DIR"/aqm/*.py
 install -m 644 "$SRC/$PLIST" "$HOME_DIR/$PLIST"
 
 if [ -f "$HOME_DIR/config.json" ]; then
@@ -34,7 +40,7 @@ fi
 # a real file for a project that lives in ~/opt.
 mkdir -p "$AGENTS_DIR" "$HOME/.local/bin"
 ln -sfn "$HOME_DIR/$PLIST" "$AGENTS_DIR/$PLIST"
-ln -sfn "$HOME_DIR/aqm.py" "$HOME/.local/bin/aqm"
+ln -sfn "$HOME_DIR/aqm-cli" "$HOME/.local/bin/aqm"
 
 # bootout then bootstrap, so a changed plist is actually picked up. bootout fails
 # when the job is not loaded, which is fine on a first install.
@@ -44,6 +50,6 @@ echo "scheduled: $LABEL, every 300 s"
 
 # Prove the deployed copy runs before walking away. The pipeline is read-only
 # until stages 4 and 6 exist, and `enabled: false` stops it before any stage.
-/usr/bin/python3 "$HOME_DIR/aqm.py" pipeline || true
+/usr/bin/python3 "$HOME_DIR/aqm-cli" pipeline || true
 echo
 echo "done. logs in $HOME_DIR/logs/, data in $HOME_DIR/data/"

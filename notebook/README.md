@@ -2,7 +2,7 @@
 
 Ad-hoc analysis, run by hand. Not deployed, not scheduled, not imported by anything
 in `release/` — which is why this is the one place in the project allowed to use
-pandas and matplotlib (`release/aqm.py` is standard library only, so the scheduled
+pandas and matplotlib (`release/aqm/` is standard library only, so the scheduled
 job cannot break when a Conda environment moves).
 
 ```bash
@@ -30,7 +30,7 @@ uses, and it is why §6 can replay two days of decisions in one cell.
 
 ## Two rules this directory keeps
 
-**It never recomputes what `aqm.py` computes.** Every number comes back from
+**It never recomputes what `release/aqm/` computes.** Every number comes back from
 `aqm.predict()` / `aqm.budget()` or out of the CSVs they read. A notebook that
 re-derived a ceiling or a rate would eventually disagree with the real one, and the
 notebook is the copy a human would be reading. This is why each window in the budget

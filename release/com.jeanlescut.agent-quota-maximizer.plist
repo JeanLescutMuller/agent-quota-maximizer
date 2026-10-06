@@ -10,7 +10,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/Users/jeanlescut/opt/agent-quota-maximizer/aqm.py</string>
+        <string>/Users/jeanlescut/opt/agent-quota-maximizer/aqm-cli</string>
         <string>pipeline</string>
     </array>
 

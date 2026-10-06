@@ -2,9 +2,9 @@
 
 This is ad-hoc, run-by-hand tooling, so it lives in the source repo and runs from
 here even though it reads the live `~/opt` state (`~/AGENTS.md`). Unlike
-`release/aqm.py` it may use pandas and matplotlib: nothing scheduled imports it.
+`release/aqm/` it may use pandas and matplotlib: nothing scheduled imports it.
 
-**It never recomputes anything `aqm.py` computes.** Every number the notebook shows
+**It never recomputes anything `release/aqm/` computes.** Every number the notebook shows
 comes back from `aqm.predict()` / `aqm.budget()` or from the CSVs they read. A
 helper that re-derived a ceiling or a rate here would eventually disagree with the
 real one, and the copy is the one a human would be reading.

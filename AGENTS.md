@@ -4,7 +4,7 @@
 
 Claude and Codex subscriptions meter usage in 5-hour windows nested inside 7-day periods, and both are use-it-or-lose-it. Measured over the last month on this machine, Claude leaves about $139 of its week unspent and Codex about $98 — Codex wastes the larger share, Claude the larger amount. This project runs read-only maintenance tasks (bug hunts, doc-drift checks, test-coverage reviews) across the repos in `~/dev`, **as late as possible** in each period, so the leftovers get spent and the user never queues behind a bot.
 
-Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the whole pipeline skeleton, including the LaunchAgent and `install.sh`. Stages 4–6 (the two that act, plus planning) are design only, so a tick cannot yet spend anything.** `release/aqm.py` is the whole implementation. A forecasting study on 42 days of real history (`design/02_prediction/DESIGN.md` §8) compared five engines and concluded that this one is already at its measured optimum; it moved `MIN_HUMAN_RESERVE_PCT` from 10% to 25% instead, which also settled the `GUARD_PCT` conflict. The next step is P3 (window starter) or P4 (execution) — see `design/DESIGN_v2.md` §6.
+Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the whole pipeline skeleton, including the LaunchAgent and `install.sh`. Stages 4–6 (the two that act, plus planning) are design only, so a tick cannot yet spend anything.** `release/aqm/` is the whole implementation, one module per stage (`design/07_pipeline/DESIGN.md` §12). A forecasting study on 42 days of real history (`design/02_prediction/DESIGN.md` §8) compared five engines and concluded that this one is already at its measured optimum; it moved `MIN_HUMAN_RESERVE_PCT` from 10% to 25% instead, which also settled the `GUARD_PCT` conflict. The next step is P3 (window starter) or P4 (execution) — see `design/DESIGN_v2.md` §6.
 
 ## Repository layout
 
@@ -12,7 +12,7 @@ Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the w
 |---|---|
 | `AGENTS.md` / `CLAUDE.md` | This file — the entry point. `CLAUDE.md` is a symlink to it |
 | [`design/`](design/) | Every design document, plus `PIPELINE_MAP.html`, the visual summary. No code, with one exception: [`02_prediction/`](design/02_prediction/lab/README.md) holds the forecasting bench — one notebook per candidate forecaster and the shared dataset they are all measured on, which belong beside the design question they investigate |
-| [`release/`](release/) | The implementation and what gets deployed: `aqm.py` (stages 1–3 plus the pipeline), `install.sh`, `uninstall.sh`, the LaunchAgent plist, the `config.json` template |
+| [`release/`](release/) | The implementation and what gets deployed: the `aqm/` package (one module per stage), the `aqm-cli` launcher, `install.sh`, `uninstall.sh`, the LaunchAgent plist, the `config.json` template |
 | [`test/`](test/) | Every test. Bash only, hermetic, no LLM is ever called ([`README`](test/README.md)) |
 | [`notebook/`](notebook/) | Ad-hoc analysis, run by hand. **`explain_budget.ipynb` takes one decision apart**, measurement by measurement ([`README`](notebook/README.md)) |
 
@@ -27,7 +27,7 @@ Four commands are runnable now:
 
 `predict` and `budget` take `--at <iso>` to decide as of a past moment, which writes nothing unless `--out` is given; every command takes `--json`. Exit codes: `0` ok, `1` error, `2` refused by a guard, `3` locked.
 
-**Deployment.** `bash release/install.sh` copies `aqm.py` and the plist into `~/opt/agent-quota-maximizer/`, symlinks the plist into `~/Library/LaunchAgents/` and `aqm` into `~/.local/bin/`, and schedules a tick every 5 minutes. It writes `config.json` with **`enabled: false`** on a first install and never overwrites an existing one, so a fresh install is inert until you fill in the repo list and flip the flag. `release/uninstall.sh` unloads the job and removes both symlinks, leaving data and logs in place.
+**Deployment.** `bash release/install.sh` copies the `aqm/` package, `aqm-cli` and the plist into `~/opt/agent-quota-maximizer/`, symlinks the plist into `~/Library/LaunchAgents/` and `aqm` into `~/.local/bin/`, and schedules a tick every 5 minutes. It writes `config.json` with **`enabled: false`** on a first install and never overwrites an existing one, so a fresh install is inert until you fill in the repo list and flip the flag. `release/uninstall.sh` unloads the job and removes both symlinks, leaving data and logs in place.
 
 Two environment variables place everything, which is why the tests need no fixtures on disk: **`$AQM_HOME`** is our own tree (default `~/opt/agent-quota-maximizer`, holding `data/`, `state/` and `artifacts/`) and **`$AQM_USAGE_DATA`** is where the raw logs are read from (default `~/opt/agent-usage-tracker`). Tests: `bash test/run.sh`.
 

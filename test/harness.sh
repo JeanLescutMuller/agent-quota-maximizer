@@ -8,7 +8,7 @@
 
 PY=/usr/bin/python3
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AQM="$REPO/release/aqm.py"
+AQM="$REPO/release/aqm-cli"      # the launcher; the package is release/aqm/
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; DIM='\033[2m'; NC='\033[0m'
 PASS=0; FAIL=0

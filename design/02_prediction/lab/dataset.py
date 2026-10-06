@@ -2,7 +2,7 @@
 
 One module, imported by every notebook in `../`, so that no two approaches can
 accidentally be scored on different rows, a different split or a different metric.
-Nothing here is imported by `release/`: this is investigation, and `aqm.py` stays
+Nothing here is imported by `release/`: this is investigation, and the package stays
 standard-library only (`../../07_pipeline/DESIGN.md` §1).
 
 What is being predicted is fixed by the stage's specification (`../DESIGN.md` §1.1):
