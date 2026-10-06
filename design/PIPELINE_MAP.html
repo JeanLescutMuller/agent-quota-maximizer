@@ -129,6 +129,14 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
 .note { border-left: 3px solid var(--lost); padding: 8px 12px; background: var(--surface); border-radius: 0 6px 6px 0; font-size: 14px }
 .formula { font: 14px/1.7 var(--f-mono); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre }
 @media (prefers-reduced-motion: no-preference) { #bf-svg rect { transition: height .15s, y .15s } }
+.note.info { border-left-color: var(--human) }
+.note.ok { border-left-color: var(--ok) }
+.badge.parked { border: 1px dashed var(--muted); color: var(--muted); text-decoration: line-through }
+.rule { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px 12px; align-items: baseline; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px }
+.rule > * { min-width: 0 }
+.rule .n { font: 800 22px/1 var(--f-display); color: var(--bot) }
+.rule .who { font: 600 11px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap }
+@media (max-width: 560px) { .rule { grid-template-columns: 28px 1fr } .rule .who { grid-column: 2 } }
 </style>
 </head>
 <body>
@@ -136,17 +144,16 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
 <div class="wrap">
 
 <header class="stack" style="padding-bottom:22px">
-  <div class="eyebrow">agent-quota-maximizer · design map · names from design/VOCABULARY.md</div>
+  <div class="eyebrow">agent-quota-maximizer · design map · revised 2026-10-06 · names from design/VOCABULARY.md</div>
   <h1>Spend the quota that would expire, as late as possible</h1>
-  <p>Every 5 minutes one tick runs six stages. Five of them only compute; two of them act. This page shows what each stage answers, what it needs from the stage before, and why.</p>
-  <div class="note"><b>Revised on 2026-10-06 — this page still shows the design before it.</b> Stage 2 (Predict) is parked: the budget keeps a fixed 25% of every window for the user, nothing starts while the user is active, and the window that outlives the weekly reset is only filled before it. The bot will run on the Debian VM, because the Mac sleeps most nights. Why, with the measurements: <code>design/DESIGN_v2.md</code> §8.</div>
+  <p>Every 5 minutes, on an always-on machine, one tick decides how much of the week cannot survive until the reset, and spends only that, at the last safe moment. There is no forecast: a fixed rule protects the user. This page shows each stage, what it needs from the one before, and why.</p>
 </header>
 
-<nav class="strip" aria-label="Stages">
-  <a href="#map">Map</a><a href="#why">Why each needs the last</a>
-  <a href="#budget">3 · Budget</a><a href="#predict">2 · Predict</a><a href="#ingest">1 · Ingest</a>
+<nav class="strip" aria-label="Sections">
+  <a href="#map">Map</a><a href="#why">Why each needs the last</a><a href="#where">Where it runs</a>
+  <a href="#budget">3 · Budget</a><a href="#protect">Protecting the user</a><a href="#ingest">1 · Ingest</a>
   <a href="#start" class="todo">4 · Start windows</a><a href="#plan" class="todo">5 · Plan</a><a href="#execute" class="todo">6 · Execute</a>
-  <a href="#gaps">Known gaps</a>
+  <a href="#open">Open questions</a>
 </nav>
 
 <!-- ============ THE PROBLEM ============ -->
@@ -154,23 +161,19 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
   <figure>
     <div class="scroll">
     <svg class="wide" viewBox="0 0 900 190" role="img" aria-label="A Claude week: about half the weekly meter is used by the user and the rest expires at the reset; the goal is for bot work to fill that part just before the reset.">
-      <text x="0" y="16" class="eyebrow bold">The weekly meter of one Claude week (8.85 units ≈ $283)</text>
-      <!-- row 1 -->
+      <text x="0" y="16" class="bold">The weekly meter of one Claude week</text>
       <text x="0" y="58" class="bold">Today</text>
       <rect x="110" y="40" width="390" height="28" class="f-human"/>
       <rect x="500" y="40" width="380" height="28" class="f-lost-soft"/>
       <rect x="500" y="40" width="380" height="28" class="s-lost dash"/>
-      <text x="305" y="58" text-anchor="middle" class="f-surface bold" style="fill:var(--surface)">human work</text>
+      <text x="305" y="58" text-anchor="middle" class="bold" style="fill:var(--surface)">human work</text>
       <text x="690" y="58" text-anchor="middle" class="t-lost bold">unspent at the reset ≈ $139 / week</text>
-      <!-- row 2 -->
       <text x="0" y="118" class="bold">Goal</text>
       <rect x="110" y="100" width="390" height="28" class="f-human"/>
-      <rect x="500" y="100" width="250" height="28" class="f-bot"/>
-      <rect x="750" y="100" width="130" height="28" class="f-lost-soft"/>
+      <rect x="500" y="100" width="340" height="28" class="f-bot"/>
+      <rect x="840" y="100" width="40" height="28" class="f-lost-soft"/>
       <text x="305" y="118" text-anchor="middle" class="bold" style="fill:var(--surface)">human work</text>
-      <text x="625" y="118" text-anchor="middle" class="bold" style="fill:var(--surface)">bot work, spent late</text>
-      <text x="815" y="118" text-anchor="middle" class="t-lost small">already_lost_units</text>
-      <!-- axis -->
+      <text x="670" y="118" text-anchor="middle" class="bold" style="fill:var(--surface)">bot work, spent late</text>
       <line x1="110" y1="146" x2="880" y2="146" class="s-muted"/>
       <text x="110" y="164" class="mono t-muted">0%</text>
       <text x="880" y="164" text-anchor="end" class="mono t-muted">100% week_used_pct</text>
@@ -178,7 +181,7 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
       <text x="876" y="184" text-anchor="end" class="small t-muted">week_end_ts: the weekly meter resets, the rest is gone</text>
     </svg>
     </div>
-    <figcaption>Measured over a month: Claude leaves about $139 of each week unspent, Codex about $98. Some of it cannot be placed in any remaining window: that part is <code>already_lost_units</code>, the number this project exists to shrink.</figcaption>
+    <figcaption>Measured over a month: Claude leaves about $139 of each week unspent, Codex about $98. Replayed over the 42 recorded days, a bot on an always-on machine recovers about 99% of it (<code>notebook/pipeline_replay.py</code>).</figcaption>
   </figure>
 
   <h3>The words used on this page</h3>
@@ -189,105 +192,113 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
     <div><b>unit</b> — one whole window = 100% of the 5-hour meter ≈ $32 Claude / $20.5 Codex.</div>
     <div><span class="key h"></span><b>human</b> — the user's own interactive work.</div>
     <div><span class="key b"></span><b>bot</b> — this project's background work.</div>
-    <div><b>_pct</b> — percent of the meter named (<code>window_</code> or <code>week_</code>).</div>
-    <div><b>predicted_</b> — the only prefix for a number about the future.</div>
+    <div><b>active</b> — the user moved the meter or sent a prompt in the last 30 min (<code>HUMAN_IDLE_MINUTES</code>).</div>
+    <div><b>burn rate</b> — how fast the bot can spend, in units per hour. Not yet measured.</div>
   </div>
 </section>
 
 <!-- ============ MAP ============ -->
 <section id="map">
   <div class="eyebrow">The pipeline</div>
-  <h2>Six stages, one tick every 5 minutes</h2>
+  <h2>Five stages on the VM, one parked</h2>
   <figure>
     <div class="scroll">
-    <svg class="wide" viewBox="0 0 1060 360" role="img" aria-label="Pipeline map: the account meter feeds ingest, predict, budget, plan and execute in a row. Start windows reads the meter and opens windows. Execute spends on the meter and records its run intervals, which ingest reads back to tell human from bot.">
+    <svg class="wide" viewBox="0 0 1060 405" role="img" aria-label="Pipeline map: on the Debian VM, ingest reads the account meter, budget decides how much, plan decides when and what, execute spends; start windows opens windows. Prediction is parked. The Mac only develops and does the user's own work.">
       <defs>
         <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-fg"/></marker>
         <marker id="m-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-bot"/></marker>
+        <marker id="m-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="f-muted"/></marker>
       </defs>
-      <!-- meter -->
-      <rect x="10" y="40" width="130" height="120" rx="6" class="f-soft"/>
-      <rect x="10" y="40" width="130" height="120" rx="6" class="s-line"/>
-      <text x="75" y="66" text-anchor="middle" class="bold">Account meter</text>
-      <text x="75" y="86" text-anchor="middle" class="small t-muted">Claude / Codex</text>
-      <text x="75" y="110" text-anchor="middle" class="mono">window_used_pct</text>
-      <text x="75" y="126" text-anchor="middle" class="mono">week_used_pct</text>
-      <text x="75" y="148" text-anchor="middle" class="small t-muted">one gauge, no "who"</text>
+      <!-- VM container -->
+      <rect x="170" y="20" width="880" height="295" rx="10" class="f-soft"/>
+      <rect x="170" y="20" width="880" height="295" rx="10" class="s-muted"/>
+      <text x="186" y="44" class="bold">Debian VM · always on</text>
+      <text x="186" y="60" class="small t-muted">one tick every 5 minutes</text>
 
-      <!-- stage boxes: x = 190, 365, 540, 715, 890 ; w = 150 -->
-      <g>
-        <rect x="190" y="40" width="150" height="120" rx="6" class="box"/>
-        <text x="202" y="62" class="bold">1 · Ingest</text>
-        <text x="202" y="80" class="mono t-muted">aqm ingest</text>
-        <text x="202" y="104">What happened?</text>
-        <text x="202" y="148" class="mono small">→ slots.csv</text>
-      </g>
-      <g>
-        <rect x="365" y="40" width="150" height="120" rx="6" class="box"/>
-        <text x="377" y="62" class="bold">2 · Predict</text>
-        <text x="377" y="80" class="mono t-muted">aqm predict</text>
-        <text x="377" y="104">How much will the</text>
-        <text x="377" y="120">user still burn?</text>
-        <text x="377" y="148" class="mono small">→ prediction.json</text>
-      </g>
-      <g>
-        <rect x="540" y="40" width="150" height="120" rx="6" class="box" style="stroke-width:2.6"/>
-        <text x="552" y="62" class="bold">3 · Budget</text>
-        <text x="552" y="80" class="mono t-muted">aqm budget</text>
-        <text x="552" y="104">How much may the</text>
-        <text x="552" y="120">bot spend, by when?</text>
-        <text x="552" y="148" class="mono small">→ budget.json</text>
-      </g>
-      <g>
-        <rect x="715" y="40" width="150" height="120" rx="6" class="box-todo"/>
-        <text x="727" y="62" class="bold">5 · Plan</text>
-        <text x="727" y="80" class="mono t-muted">aqm plan</text>
-        <text x="727" y="104">From when, what,</text>
-        <text x="727" y="120">where, which model?</text>
-        <text x="727" y="148" class="mono small">→ plan.json</text>
-      </g>
-      <g>
-        <rect x="890" y="40" width="150" height="120" rx="6" class="box-todo"/>
-        <text x="902" y="62" class="bold">6 · Execute</text>
-        <text x="902" y="80" class="mono t-muted">aqm execute</text>
-        <text x="902" y="104">Run read-only</text>
-        <text x="902" y="120">tasks on repos</text>
-        <text x="902" y="148" class="mono small t-bot">ACTS: spends units</text>
-      </g>
-      <!-- arrows along the row -->
-      <line x1="140" y1="100" x2="188" y2="100" class="s-line" marker-end="url(#m-a)"/>
-      <line x1="340" y1="100" x2="363" y2="100" class="s-line" marker-end="url(#m-a)"/>
-      <line x1="515" y1="100" x2="538" y2="100" class="s-line" marker-end="url(#m-a)"/>
-      <line x1="690" y1="100" x2="713" y2="100" class="s-line" marker-end="url(#m-a)"/>
-      <line x1="865" y1="100" x2="888" y2="100" class="s-line" marker-end="url(#m-a)"/>
-      <text x="164" y="92" text-anchor="middle" class="small t-muted">reads</text>
-      <!-- slots also go to budget (week level) -->
-      <path d="M265,40 L265,22 L615,22 L615,38" class="s-muted dash" marker-end="url(#m-a)"/>
-      <text x="440" y="16" text-anchor="middle" class="small t-muted">budget also reads week_used_pct, week_end_ts from slots.csv</text>
+      <!-- meter -->
+      <rect x="10" y="70" width="130" height="120" rx="6" class="box"/>
+      <text x="75" y="94" text-anchor="middle" class="bold">Account meter</text>
+      <text x="75" y="112" text-anchor="middle" class="small t-muted">server-side, per agent</text>
+      <text x="75" y="136" text-anchor="middle" class="mono">window_used_pct</text>
+      <text x="75" y="152" text-anchor="middle" class="mono">week_used_pct</text>
+      <text x="75" y="174" text-anchor="middle" class="small t-muted">readable from any machine</text>
+
+      <!-- Mac -->
+      <rect x="10" y="240" width="130" height="75" rx="6" class="box-todo"/>
+      <text x="75" y="262" text-anchor="middle" class="bold">Mac</text>
+      <text x="75" y="280" text-anchor="middle" class="small t-muted">development and</text>
+      <text x="75" y="294" text-anchor="middle" class="small t-muted">the user's own work</text>
+      <line x1="75" y1="240" x2="75" y2="193" class="s-human" marker-end="url(#m-a)"/>
+      <text x="82" y="222" class="small t-human">human work</text>
+
+      <!-- stage boxes: y 72..180 -->
+      <rect x="190" y="72" width="155" height="108" rx="6" class="box"/>
+      <text x="202" y="94" class="bold">1 · Ingest</text>
+      <text x="202" y="112" class="mono t-muted">aqm ingest</text>
+      <text x="202" y="136">What happened?</text>
+      <text x="202" y="168" class="mono small">→ meter.csv, slots.csv</text>
+
+      <rect x="380" y="72" width="155" height="108" rx="6" class="box" style="stroke-width:2.6"/>
+      <text x="392" y="94" class="bold">3 · Budget</text>
+      <text x="392" y="112" class="mono t-muted">aqm budget</text>
+      <text x="392" y="136">How much, by when?</text>
+      <text x="392" y="152" class="small t-muted">25% always kept</text>
+      <text x="392" y="168" class="mono small">→ budget.json</text>
+
+      <rect x="570" y="72" width="155" height="108" rx="6" class="box-todo"/>
+      <text x="582" y="94" class="bold">5 · Plan</text>
+      <text x="582" y="112" class="mono t-muted">aqm plan</text>
+      <text x="582" y="136">When to start?</text>
+      <text x="582" y="152">What to run?</text>
+      <text x="582" y="168" class="mono small">→ plan.json</text>
+
+      <rect x="760" y="72" width="155" height="108" rx="6" class="box-todo"/>
+      <text x="772" y="94" class="bold">6 · Execute</text>
+      <text x="772" y="112" class="mono t-muted">aqm execute</text>
+      <text x="772" y="136">Run read-only</text>
+      <text x="772" y="152">tasks on repos</text>
+      <text x="772" y="168" class="mono small t-bot">ACTS: spends units</text>
+
+      <!-- parked predict -->
+      <rect x="935" y="72" width="100" height="108" rx="6" class="box-todo" style="opacity:.75"/>
+      <text x="947" y="94" class="bold t-muted" style="text-decoration:line-through">2 · Predict</text>
+      <text x="947" y="116" class="small t-muted">parked</text>
+      <text x="947" y="132" class="small t-muted">returns only if</text>
+      <text x="947" y="146" class="small t-muted">the bot burns</text>
+      <text x="947" y="160" class="small t-muted">&lt; 0.5 unit/h</text>
+
+      <!-- row arrows -->
+      <line x1="140" y1="126" x2="188" y2="126" class="s-line" marker-end="url(#m-a)"/>
+      <text x="164" y="118" text-anchor="middle" class="small t-muted">polls</text>
+      <line x1="345" y1="126" x2="378" y2="126" class="s-line" marker-end="url(#m-a)"/>
+      <line x1="535" y1="126" x2="568" y2="126" class="s-line" marker-end="url(#m-a)"/>
+      <line x1="725" y1="126" x2="758" y2="126" class="s-line" marker-end="url(#m-a)"/>
+
+      <!-- presence input to plan -->
+      <path d="M268,180 L268,200 L648,200 L648,182" class="s-human dash" marker-end="url(#m-a)"/>
+      <text x="458" y="214" text-anchor="middle" class="small t-human">is the user active? (the meter moved while the bot was idle)</text>
 
       <!-- start windows -->
-      <rect x="540" y="200" width="150" height="76" rx="6" class="box-todo"/>
-      <text x="552" y="222" class="bold">4 · Start windows</text>
-      <text x="552" y="240" class="mono t-muted small">aqm start_windows</text>
-      <text x="552" y="262" class="mono small t-bot">ACTS: "ok" ≈ $0.02</text>
-      <path d="M265,160 L265,238 L538,238" class="s-muted" marker-end="url(#m-a)"/>
-      <text x="400" y="230" text-anchor="middle" class="mono small t-muted">is_window_open?</text>
+      <rect x="380" y="230" width="155" height="70" rx="6" class="box-todo"/>
+      <text x="392" y="252" class="bold">4 · Start windows</text>
+      <text x="392" y="270" class="mono small t-muted">aqm start_windows</text>
+      <text x="392" y="288" class="mono small t-bot">ACTS: "ok" ≈ $0.02</text>
+      <path d="M220,180 L220,265 L378,265" class="s-muted" marker-end="url(#m-m)"/>
+      <text x="300" y="258" text-anchor="middle" class="mono small t-muted">is_window_open?</text>
 
-      <!-- bot spend lane back to meter -->
-      <path d="M965,160 L965,310 L75,310 L75,162" class="s-bot" style="stroke-width:1.6" marker-end="url(#m-b)"/>
-      <path d="M615,276 L615,308" class="s-bot" style="stroke-width:1.6"/>
-      <text x="790" y="302" text-anchor="middle" class="small t-bot bold">bot work moves the meter</text>
-      <text x="470" y="302" text-anchor="middle" class="small t-bot">opens a window</text>
-      <!-- run intervals back to ingest -->
-      <path d="M1000,160 L1000,340 L300,340 L300,162" class="s-muted dash" marker-end="url(#m-a)"/>
-      <text x="650" y="334" text-anchor="middle" class="small t-muted">bot run intervals (state/runs.jsonl): lets ingest tell human movement from bot movement</text>
+      <!-- bot spend back to meter -->
+      <path d="M837,180 L837,345 L156,345 L156,176 L143,176" class="s-bot" style="stroke-width:1.6" marker-end="url(#m-b)"/>
+      <path d="M457,300 L457,343" class="s-bot" style="stroke-width:1.6"/>
+      <text x="650" y="338" text-anchor="middle" class="small t-bot bold">bot work moves the meter</text>
+      <text x="320" y="338" text-anchor="middle" class="small t-bot">opens a window</text>
 
       <!-- legend -->
-      <rect x="10" y="200" width="22" height="14" rx="3" class="box"/><text x="40" y="211" class="small">built (P0–P2)</text>
-      <rect x="10" y="222" width="22" height="14" rx="3" class="box-todo"/><text x="40" y="233" class="small">design only</text>
+      <rect x="190" y="372" width="22" height="14" rx="3" class="box"/><text x="220" y="383" class="small">built</text>
+      <rect x="270" y="372" width="22" height="14" rx="3" class="box-todo"/><text x="300" y="383" class="small">design only</text>
+      <line x1="390" y1="379" x2="420" y2="379" class="s-human dash"/><text x="428" y="383" class="small">an observation, not a forecast</text>
     </svg>
     </div>
-    <figcaption>Ingest, predict and budget are built and run every tick in about 7 ms. They only compute. Start windows and execute are the two stages that spend quota; neither is built yet, so today a tick never spends anything. When the budget says <code>extra_quota_to_spend_units = 0</code> (the usual case), the tick stops after budget.</figcaption>
+    <figcaption>Ingest and budget are built and run every tick in milliseconds. Start windows and execute are the two stages that spend quota, and neither is built yet. Predict is parked, not deleted: it comes back only if the bot cannot burn fast enough (<a href="#protect">see below</a>). Until the move to the VM (phase P2b), the code still runs on the Mac and still runs stage 2.</figcaption>
   </figure>
 </section>
 
@@ -295,28 +306,56 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
 <section id="why">
   <div class="eyebrow">Read from the end</div>
   <h2>Why each stage needs the one before</h2>
-  <p>Start from what finally runs, and ask what it needs to know. Each answer is exactly the output of the previous stage.</p>
+  <p>Start from what finally runs, and ask what it needs to know. Each answer is the output of the previous stage, or a measurement.</p>
   <div class="chain">
     <div class="link"><div class="who">6 · Execute<small>runs workers</small></div>
       <div><div class="needs">needs: how many units, until when, from when, which tasks</div>
-      <div class="why">It must stop on its own: it works to a fixed mandate and never re-plans mid-run.</div></div></div>
+      <div class="why">It works to a fixed mandate and stops on its own: at the amount, at the deadline, or when the config says so. It does not start a task that would not fit in what is left.</div></div></div>
     <div class="arrow-row">↑ given by</div>
-    <div class="link"><div class="who">5 · Plan<small>the mandate</small></div>
-      <div><div class="needs">needs: <code>extra_quota_to_spend_units</code>, <code>spend_by_ts</code>, and <code>predicted_p95_human_usage_pct</code> for a last clamp</div>
-      <div class="why">Planning picks <em>when to start</em> and <em>what to run</em>. It cannot invent the amount; the amount comes from the week's arithmetic.</div></div></div>
+    <div class="link"><div class="who">5 · Plan<small>when and what</small></div>
+      <div><div class="needs">needs: <code>extra_quota_to_spend_units</code>, <code>spend_by_ts</code>, the bot's <b>measured burn rate</b>, and whether the user is <b>active</b></div>
+      <div class="why">The start time is the deadline minus the time needed to burn the amount. Nothing starts while the user is active: that is an observation of the meter, not a forecast.</div></div></div>
     <div class="arrow-row">↑ given by</div>
     <div class="link"><div class="who">3 · Budget<small>how much, by when</small></div>
-      <div><div class="needs">needs: <code>week_used_pct</code>, <code>week_end_ts</code>, <code>window_used_pct</code>, <code>window_end_ts</code>, and <code>predicted_p95_human_usage_pct</code></div>
-      <div class="why">Without a forecast it would fill the running window up to 90% while the user may be in the middle of using it. The forecast sets how much of the window to hold back for the user.</div></div></div>
-    <div class="arrow-row">↑ given by</div>
-    <div class="link"><div class="who">2 · Predict<small>human demand ahead</small></div>
-      <div><div class="needs">needs: <code>slot_window_human_pct</code> per slot for the last 30 minutes and the open window, and <code>was_human_active</code></div>
-      <div class="why">It needs the <em>human</em> part only. Forecasting from the raw meter would read our own spend as user demand, and the bot would then refuse to spend: a loop that must never close.</div></div></div>
+      <div><div class="needs">needs: <code>week_used_pct</code>, <code>week_end_ts</code>, <code>window_used_pct</code>, <code>window_end_ts</code>, and <code>week_capacity_units</code> (measured)</div>
+      <div class="why">It keeps a fixed 25% of every window for the user, with no forecast. It needs the measured number of units a week holds to know whether the windows left can absorb what is left of the week.</div></div></div>
     <div class="arrow-row">↑ given by</div>
     <div class="link"><div class="who">1 · Ingest<small>what happened</small></div>
-      <div><div class="needs">needs: the raw meter readings, and our own bot run intervals</div>
-      <div class="why">The meter is one account-wide gauge read at irregular times (~24 readings a day on Claude, ~5 on Codex). Ingest turns that into a regular 5-minute table and splits each slot into human and bot.</div></div></div>
+      <div><div class="needs">needs: the meter readings, polled on the VM, and what the VM itself ran</div>
+      <div class="why">It removes stale readings (a percentage never goes down within a window or a week), keeps the latest level, and builds the 5-minute table the week capacity is measured from.</div></div></div>
   </div>
+</section>
+
+<!-- ============ WHERE ============ -->
+<section id="where">
+  <div class="eyebrow">Measured 2026-10-05</div>
+  <h2>Where it runs: the VM, because the Mac sleeps</h2>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" id="sleep-svg" viewBox="0 0 760 250" role="img" aria-label="Hours the Mac was awake, one row per day for the week of 2026-09-29: nights are dark almost every day, and in the 24 hours before the Claude reset the Mac was awake only during the day."></svg>
+    </div>
+    <figcaption>From <code>pmset -g log</code>: minutes awake in each hour. The Mac was asleep 52% of the week, and almost every night, because its lid is closed on battery — something <code>caffeinate</code> cannot prevent. In the 24 hours before the Claude reset (outlined), it was awake 13 hours, all of them during the day, when the user works.</figcaption>
+  </figure>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 760 170" role="img" aria-label="Share of today's waste still wasted with the bot: on the Mac 41 percent for Claude and 36 percent for Codex; on an always-on machine 1 percent and 0 percent.">
+      <text x="0" y="16" class="bold">Share of today's waste still wasted, with the bot running</text>
+      <g id="waste-bars"></g>
+      <line x1="200" y1="150" x2="700" y2="150" class="s-muted"/>
+      <text x="200" y="166" class="mono small t-muted">0%</text>
+      <text x="700" y="166" text-anchor="end" class="mono small t-muted">100%</text>
+    </svg>
+    </div>
+    <figcaption>The replay over 42 days. On the Mac, the sleep estimate is optimistic (it counts 60% of the time as awake against 48% measured), so the real figure is worse.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>What the decision needs</th><th>Where it comes from</th><th>On the VM</th></tr></thead>
+    <tbody>
+      <tr><td>Week and window percent, with their resets</td><td>Claude: <code>GET api.anthropic.com/api/oauth/usage</code>. Codex: <code>codex app-server</code></td><td>Claude: yes (Claude Code is logged in). Codex: after installing it</td></tr>
+      <tr><td>What the bot itself ran</td><td>The VM's own processes</td><td>Yes</td></tr>
+      <tr><td>The repos to review</td><td><code>git clone</code> from GitHub</td><td>To do</td></tr>
+      <tr><td>Whether the user is active</td><td>The meter moving while the bot is idle</td><td>Yes. The Mac's session files are not needed</td></tr>
+    </tbody></table></div>
 </section>
 
 <!-- ============ BUDGET ============ -->
@@ -329,7 +368,7 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
     <div><div class="eyebrow">Needs</div><ul>
       <li><code>week_used_pct</code>, <code>week_end_ts</code>: how much of the week is left, and when it resets</li>
       <li><code>window_used_pct</code>, <code>window_end_ts</code>: the running window</li>
-      <li><code>predicted_p95_human_usage_pct</code>: what to hold back for the user in that window</li></ul></div>
+      <li><code>week_capacity_units</code>: how many units one week holds, <b>measured</b></li></ul></div>
     <div><div class="eyebrow">Gives</div><ul>
       <li><code>extra_quota_to_spend_units</code>: <b>spend this many units now</b></li>
       <li><code>spend_by_ts</code>: before this instant, or it is lost</li>
@@ -339,36 +378,60 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
   <h3>Step 1 · How much can one window take?</h3>
   <figure>
     <div class="scroll">
-    <svg class="wide" viewBox="0 0 900 230" role="img" aria-label="The running window's 5-hour meter: 31 percent already used, 37 percent held back for the user as human_reserve_pct, leaving 32 percent for the bot by quota. By time, 62 minutes at 1 unit per hour allows 1.03 units. The smaller, 0.32 units, is max_spend_units, limited by quota.">
+    <svg class="wide" viewBox="0 0 900 230" role="img" aria-label="The running window's 5-hour meter: 31 percent already used, a fixed 25 percent kept for the user, leaving 44 percent for the bot by quota. By time, 62 minutes at 1 unit per hour allows 1.03 units. The smaller, 0.44 units, is max_spend_units, limited by quota.">
       <defs><pattern id="hatch1" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" class="f-human-soft"/><line x1="0" y1="0" x2="0" y2="7" class="s-human" style="stroke-width:2"/></pattern></defs>
-      <text x="0" y="18" class="eyebrow bold">The running window, 100% of the 5-hour meter (running example)</text>
-      <!-- bar 100% = 700px from x=100 -->
+      <text x="0" y="18" class="bold">The running window, 100% of the 5-hour meter (example)</text>
       <rect x="100" y="34" width="217" height="40" class="f-human"/>
-      <rect x="317" y="34" width="224" height="40" class="f-bot-soft"/>
-      <rect x="317" y="34" width="224" height="40" class="s-bot" style="stroke-width:2"/>
-      <rect x="541" y="34" width="259" height="40" fill="url(#hatch1)"/>
+      <rect x="317" y="34" width="308" height="40" class="f-bot-soft"/>
+      <rect x="317" y="34" width="308" height="40" class="s-bot" style="stroke-width:2"/>
+      <rect x="625" y="34" width="175" height="40" fill="url(#hatch1)"/>
       <rect x="100" y="34" width="700" height="40" class="s-line"/>
       <text x="208" y="59" text-anchor="middle" class="bold" style="fill:var(--surface)">used 31%</text>
-      <text x="429" y="59" text-anchor="middle" class="bold t-bot">bot may spend 32%</text>
-      <text x="670" y="59" text-anchor="middle" class="bold t-human">held for the user 37%</text>
+      <text x="471" y="59" text-anchor="middle" class="bold t-bot">bot may spend 44%</text>
+      <text x="712" y="59" text-anchor="middle" class="bold t-human">kept: 25%</text>
       <text x="208" y="92" text-anchor="middle" class="mono small">window_used_pct</text>
-      <text x="429" y="92" text-anchor="middle" class="mono small">max_spend_units_by_quota = 0.32</text>
-      <text x="670" y="92" text-anchor="middle" class="mono small">human_reserve_pct</text>
-      <text x="670" y="107" text-anchor="middle" class="mono small t-muted">= max(MIN_HUMAN_RESERVE_PCT 10, predicted_p95 37)</text>
+      <text x="471" y="92" text-anchor="middle" class="mono small">max_spend_units_by_quota = 0.44</text>
+      <text x="712" y="92" text-anchor="middle" class="mono small">MIN_HUMAN_RESERVE_PCT</text>
+      <text x="712" y="107" text-anchor="middle" class="small t-muted">fixed, no forecast</text>
       <text x="0" y="59" class="small t-muted">by quota</text>
-
-      <!-- by time -->
       <text x="0" y="150" class="small t-muted">by time</text>
       <rect x="100" y="132" width="700" height="28" class="f-soft"/>
       <rect x="100" y="132" width="700" height="28" class="s-muted"/>
       <text x="450" y="151" text-anchor="middle" class="small">62 minutes left × BOT_BURN_UNITS_PER_HOUR 1.0 = <tspan class="mono bold">max_spend_units_by_time = 1.03</tspan></text>
-
-      <!-- result -->
-      <text x="100" y="196" class="bold">max_spend_units = min(0.32, 1.03) = 0.32</text>
+      <text x="100" y="196" class="bold">max_spend_units = min(0.44, 1.03) = 0.44</text>
       <text x="100" y="216" class="mono small t-muted">limited_by: "quota"   (the two limits are compared, never multiplied)</text>
     </svg>
     </div>
-    <figcaption>The bot may only use what the user will not need. That is where prediction comes in: <code>human_reserve_pct</code> is the larger of a fixed floor (10%) and the forecast. Every later, not-yet-open window uses the floor only, so it can take 0.90 units.</figcaption>
+    <figcaption>Every window keeps the same 25% for the user, whatever the time of day: no forecast moves it. A window not yet open can take 0.75 unit.</figcaption>
+  </figure>
+
+  <h3>Step 1b · The window that outlives the weekly reset</h3>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 900 200" role="img" aria-label="A 5-hour window that started one hour before the weekly reset: the bot may fill only one fifth of the usual 75 percent, 15 percent, so the user starts the new week with most of the window free.">
+      <defs><pattern id="hatch2" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" class="f-human-soft"/><line x1="0" y1="0" x2="0" y2="7" class="s-human" style="stroke-width:2"/></pattern></defs>
+      <text x="0" y="18" class="bold">A window that started 1 hour before the weekly reset</text>
+      <!-- timeline 5h over 700px from x=100 -->
+      <rect x="100" y="34" width="140" height="26" class="f-bot-soft"/>
+      <rect x="240" y="34" width="560" height="26" class="f-soft"/>
+      <rect x="100" y="34" width="700" height="26" class="s-line"/>
+      <line x1="240" y1="26" x2="240" y2="120" class="s-line" style="stroke-width:2.5"/>
+      <text x="240" y="134" text-anchor="middle" class="mono small bold">week_end_ts</text>
+      <text x="170" y="52" text-anchor="middle" class="small">old week</text>
+      <text x="520" y="52" text-anchor="middle" class="small">the user's new week — same 5-hour window</text>
+      <text x="0" y="52" class="small t-muted">time</text>
+      <!-- meter -->
+      <text x="0" y="96" class="small t-muted">meter</text>
+      <rect x="100" y="80" width="105" height="26" class="f-bot"/>
+      <rect x="205" y="80" width="595" height="26" fill="url(#hatch2)"/>
+      <rect x="100" y="80" width="700" height="26" class="s-line"/>
+      <text x="152" y="98" text-anchor="middle" class="small bold" style="fill:var(--surface)">bot ≤ 15%</text>
+      <text x="500" y="98" text-anchor="middle" class="small bold t-human">left for the user's new week</text>
+      <text x="100" y="160" class="small">bot's limit = 75% × (share of the window before the reset) = 75% × 1/5 = <tspan class="bold">15%</tspan></text>
+      <text x="100" y="180" class="small t-muted">Without this rule the bot filled it to 75% just before the reset, and the user started the new week three quarters blocked.</text>
+    </svg>
+    </div>
+    <figcaption>A weekly reset does not reset the 5-hour window. This was the main source of collisions once the bot spent right up to the reset; with the rule, the replay found none at a burn rate of 0.5 unit/h or more.</figcaption>
   </figure>
 
   <h3>Step 2 · Fill the remaining windows from the end of the week backwards</h3>
@@ -376,132 +439,116 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
     <div class="controls">
       <label for="bf-h">Time until <code>week_end_ts</code> <output id="bf-h-out">25 h 07</output>
         <input id="bf-h" type="range" min="1" max="60" step="0.25" value="25.12"></label>
-      <label for="bf-w"><code>week.left_units</code> (units left in the week, user's and ours) <output id="bf-w-out">5.75</output>
-        <input id="bf-w" type="range" min="0" max="8.85" step="0.05" value="5.75"></label>
+      <label for="bf-w"><code>week.left_units</code> (units left in the week, the user's and the bot's) <output id="bf-w-out">4.94</output>
+        <input id="bf-w" type="range" min="0" max="7.6" step="0.02" value="4.94"></label>
     </div>
     <div class="scroll"><svg id="bf-svg" class="wide" viewBox="0 0 900 260" role="img" aria-label="Interactive backwards fill: remaining windows to the weekly reset, each filled up to its max_spend_units starting from the last window."></svg></div>
     <div class="readout">
-      <div><div class="v t-bot" id="bf-now" style="color:var(--bot)">0.85</div><div class="n">extra_quota_to_spend_units (the running window's share)</div></div>
+      <div><div class="v" id="bf-now" style="color:var(--bot)">0.70</div><div class="n">extra_quota_to_spend_units (the running window's share)</div></div>
       <div><div class="v" id="bf-by">4 h 43</div><div class="n">spend_by_ts, from now (window end − 5 min)</div></div>
-      <div><div class="v" id="bf-lost" style="color:var(--lost)">1.30</div><div class="n">already_lost_units</div></div>
+      <div><div class="v" id="bf-lost" style="color:var(--lost)">1.24</div><div class="n">already_lost_units</div></div>
     </div>
-    <figcaption>Default values are a real tick from 2026-10-04 (Claude, Sunday 19:52): every window to the reset is full and 1.30 units (about $41) still fit nowhere. Drag the reset further away and the running window drops to 0: the later windows absorb everything, so the bot waits and the user keeps first claim. This is "as late as possible", and it needs no forecast beyond the running window.</figcaption>
+    <figcaption>Defaults: the real tick of 2026-10-04, Sunday 19:52 — week 35% used, 25 h to the reset, the running window 5% used. With the measured 7.6 units a week, 4.94 units were left and about 1.24 fit nowhere. Drag the reset further away and the running window's share drops to 0: later windows absorb everything, so the bot waits and the user keeps first claim.</figcaption>
   </figure>
-  <div class="formula">week.left_units = (100 − week_used_pct) / 100 × WEEK_CAPACITY_UNITS     # 8.85 Claude, 6.2 Codex
-for window in reversed(remaining_windows):
-    planned_units = min(max_spend_units, still_to_place)
-    still_to_place −= planned_units
-extra_quota_to_spend_units = remaining_windows[0].planned_units
-already_lost_units         = still_to_place</div>
-</section>
+  <div class="formula">spend now          = max(0, week.left_units − Σ max_spend_units of the later windows),
+                     capped at this window's max_spend_units
+already_lost_units = max(0, week.left_units − Σ max_spend_units of every window)
+week.left_units    = (100 − week_used_pct) / 100 × week_capacity_units</div>
 
-<!-- ============ PREDICT ============ -->
-<section id="predict">
-  <div class="stage-head"><div class="stage-no">2</div>
-    <div><h2>Predict <span class="badge built">built</span></h2>
-    <div class="q">How much of the 5-hour meter will the user still burn before the window resets?</div></div></div>
-
-  <h3>Exactly what is predicted</h3>
-  <div class="tbl"><table>
-    <thead><tr><th>Question</th><th>Answer</th><th>Why that choice</th></tr></thead>
-    <tbody>
-      <tr><td>Which value</td><td><code>predicted_p95_human_usage_pct</code></td><td>The one number budget subtracts from the window.</td></tr>
-      <tr><td>Unit</td><td>% of the 5-hour meter, 0–100</td><td>The limit is enforced in percent. Units and dollars are display only.</td></tr>
-      <tr><td>Whose usage</td><td><span class="key h"></span>human only</td><td>Including bot spend would predict our own spend as demand and block it.</td></tr>
-      <tr><td>Which statistic</td><td>95th percentile, not the average</td><td>Under-predicting blocks the user. Over-predicting only leaves quota unspent, which the next tick can still recover.</td></tr>
-      <tr><td>Horizon</td><td><code>predicted_horizon_minutes</code> = min(minutes to <code>window_end_ts</code>, 120)</td><td>"40% over 34 min" and "40% over 120 min" are different claims. 120 = <code>FORECAST_HOURS</code> × 60, how long a measured pace is trusted.</td></tr>
-      <tr><td>Which window</td><td>the running one only, named by <code>window_end_ts</code></td><td>The backwards fill leaves every earlier window to the user anyway; later windows use <code>MIN_HUMAN_RESERVE_PCT</code>. Budget refuses a forecast whose window has since reset.</td></tr>
-      <tr><td>Freshness</td><td>every tick; older than 600 s = refused</td><td>A stale forecast can miss a user who just started.</td></tr>
-      <tr><td>If unreadable</td><td><code>100</code></td><td>Fail safe: a full reserve, nothing is spent.</td></tr>
-    </tbody></table></div>
-
-  <h3>How today's engine (recent-rate-v1) gets there</h3>
+  <h3>How many units a week holds: measured, not 8.85</h3>
   <figure>
     <div class="scroll">
-    <svg class="wide" viewBox="0 0 900 250" role="img" aria-label="Timeline of the running window: human slots in the past, the last 30 minutes highlighted, then from now a forecast block of 62 minutes up to window_end_ts, holding 37 percent.">
-      <defs><pattern id="hatch2" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" class="f-human-soft"/><line x1="0" y1="0" x2="0" y2="7" class="s-human" style="stroke-width:2"/></pattern></defs>
-      <!-- axis: window 300 min over 800px from x=60 → 2.667 px/min. now at 238 min -->
-      <line x1="60" y1="170" x2="860" y2="170" class="s-line"/>
-      <line x1="60" y1="164" x2="60" y2="176" class="s-line"/>
-      <line x1="860" y1="30" x2="860" y2="176" class="s-line"/>
-      <text x="60" y="192" class="mono small">window opened</text>
-      <text x="860" y="192" text-anchor="end" class="mono small">window_end_ts</text>
-      <!-- past slots: 47 slots of 5 min, bars of human pct (scaled ×10px per %) -->
-      <g id="pred-bars"></g>
-      <!-- last 30 min band: 208..238 min → x 614.7..694.7 -->
-      <rect x="614.7" y="40" width="80" height="130" class="f-human-soft" style="opacity:.55"/>
-      <text x="654.7" y="34" text-anchor="middle" class="mono small t-human">last_30_min</text>
-      <!-- now -->
-      <line x1="694.7" y1="22" x2="694.7" y2="200" class="s-line" style="stroke-width:2"/>
-      <text x="694.7" y="214" text-anchor="middle" class="bold">now</text>
-      <!-- forecast block -->
-      <rect x="696" y="70" width="163" height="100" fill="url(#hatch2)"/>
-      <text x="777" y="98" text-anchor="middle" class="bold t-human">37%</text>
-      <text x="777" y="114" text-anchor="middle" class="small">predicted_p95_</text>
-      <text x="777" y="128" text-anchor="middle" class="small">human_usage_pct</text>
-      <!-- horizon bracket -->
-      <path d="M696,232 L696,238 L859,238 L859,232" class="s-line"/>
-      <text x="777" y="232" text-anchor="middle" class="mono small">predicted_horizon_minutes = 62</text>
-      <text x="380" y="232" text-anchor="middle" class="small t-muted">current_window: the whole open window so far (238 min)</text>
-      <path d="M60,222 L60,226 L692,226 L692,222" class="s-muted"/>
-      <text x="0" y="100" class="small t-muted" transform="rotate(-90 12 100)">slot_window_human_pct</text>
+    <svg class="wide" viewBox="0 0 760 210" role="img" aria-label="Units per Claude week, measured week by week: 10.1, 9.2, 8.2, 7.3, 7.6, against the 8.85 that used to be hard-coded.">
+      <g id="cap-bars"></g>
     </svg>
     </div>
-    <figcaption>Two measures of the user's pace, and the higher one wins. The last 30 minutes reacts fast to a burst. The whole-window average stops a 20-minute pause from reading as "the user left", which on 2026-10-04 made the first version predict 0% just before the user burned the remaining 69%.</figcaption>
+    <figcaption>Measured as the window percent spent in a week divided by that week's peak <code>week_used_pct</code>. The constant 8.85 overstated what is left by about 15% in the last weeks, so the budget now measures it over the last two complete weeks.</figcaption>
   </figure>
-  <div class="formula">rate  = max( last_30_min.human_avg_burn_rate  0.40 ,  current_window.human_avg_burn_rate  0.13 )   # % per minute
-        (raised to ACTIVE_HUMAN_BURN_RATE 0.15 if was_human_active but the meter has not moved yet)
-predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULTIPLIER
-                              = 0.40 × 62 × 1.5  =  37          (clamped to 100)</div>
-  <p class="muted">The engine is swappable. Budget reads only three fields (<code>predicted_p95_human_usage_pct</code>, <code>predicted_horizon_minutes</code>, <code>window_end_ts</code>); everything else sits under <code>internals</code>, and a test checks that blanking it changes nothing.</p>
+</section>
+
+<!-- ============ PROTECT ============ -->
+<section id="protect">
+  <div class="eyebrow">Replaces stage 2 · decided 2026-10-06</div>
+  <h2>Protecting the user without a forecast</h2>
+  <p>Replaying the whole decision over 42 days, the forecast lowered the amount on 3.1% (Claude) and 0.1% (Codex) of ticks and changed no outcome while the bot burns at 0.5 unit/h or more. Four plain parts do its job.</p>
+  <div class="stack">
+    <div class="rule"><div class="n">1</div><div>Spend only what the later windows cannot absorb, and keep <b>25% of every window</b> for the user.</div><div class="who">budget</div></div>
+    <div class="rule"><div class="n">2</div><div>The window that outlives the weekly reset gets <b>only its share before the reset</b>.</div><div class="who">budget</div></div>
+    <div class="rule"><div class="n">3</div><div><b>Start just in time</b>: the amount divided by the measured burn rate, × 1.5, before <code>spend_by_ts</code>.</div><div class="who">plan</div></div>
+    <div class="rule"><div class="n">4</div><div><b>Never start while the user is active</b>: they moved the meter or sent a prompt in the last 30 minutes.</div><div class="who">plan</div></div>
+  </div>
+
+  <h3>Why part 4: the next hours look very different when the user is active</h3>
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 760 250" role="img" aria-label="On Claude, the chance the user uses more than 25 percent of a window: within 1 hour 19 percent if active against 2 percent if not; 1.5 hours 28 against 3; 3 hours 45 against 7; 5 hours 52 against 13.">
+      <g id="risk-bars"></g>
+    </svg>
+    </div>
+    <figcaption>Claude, 42 days: how often the user uses more than 25% of a window within the next hours. "Active" is true on 10% of slots. On Codex: 1% against 0% within an hour, 13% against 2% within three. Part 4 also covers working hard an hour before the weekly reset: what is left is the user's.</figcaption>
+  </figure>
+
+  <h3>The one condition that would bring the forecast back: a slow bot</h3>
+  <p>The longer the bot needs to burn its amount, the earlier it starts, and the more likely the user arrives in the middle. Either the bot burns fast, or the user's activity has to be predicted.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Bot burn rate</th><th>Lead time for 0.75 unit</th><th>The rule, Claude</th><th>The rule, Codex</th><th>Old forecast, Claude</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1 unit/h</td><td>≈ 1 h</td><td>0 collisions</td><td>0 collisions</td><td>0 collisions</td></tr>
+      <tr><td class="num">0.5 unit/h</td><td>≈ 2¼ h</td><td>0 collisions</td><td>1 (0.1 h)</td><td>0 collisions</td></tr>
+      <tr><td class="num">0.25 unit/h</td><td>≈ 4½ h</td><td><b style="color:var(--lost)">3, 5.4 h of waiting</b></td><td>2, 4.7 h</td><td>2, 1.1 h</td></tr>
+    </tbody></table></div>
+  <div class="formula">P4 measures the bot's burn rate first, per agent, with 1, 2 and 3 parallel workers
+   ≥ 0.5 unit/h   the rule stands, stage 2 stays parked
+   &lt; 0.5 unit/h   more workers first; if still below, stage 2 comes back</div>
+  <p class="muted">A collision is the user hitting a full 5-hour window the bot had spent in, summed over six weeks on an always-on machine. Stage 2 and its study stay in <code>design/02_prediction/</code>.</p>
 </section>
 
 <!-- ============ INGEST ============ -->
 <section id="ingest">
   <div class="stage-head"><div class="stage-no">1</div>
     <div><h2>Ingest <span class="badge built">built</span></h2>
-    <div class="q">What happened on the meter, slot by slot, and who caused it?</div></div></div>
+    <div class="q">What happened on the meter, slot by slot?</div></div></div>
 
   <figure>
     <div class="scroll">
-    <svg class="wide" viewBox="0 0 900 330" role="img" aria-label="Raw meter readings at irregular times, one stale reading dropped, become eight 5-minute slots with slot_window_used_pct; slots during a bot run interval are coloured bot, the others human.">
+    <svg class="wide" viewBox="0 0 900 290" role="img" aria-label="Raw meter readings at irregular times, one stale reading dropped, become eight 5-minute slots with slot_window_used_pct.">
       <defs><marker id="m-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="f-muted"/></marker></defs>
-      <!-- x: 0..40 min over 720px from x=150 → 18 px/min -->
-      <text x="0" y="22" class="eyebrow bold">Raw readings</text>
+      <text x="0" y="22" class="bold">Raw readings</text>
       <text x="0" y="40" class="small t-muted">window_used_pct,</text>
       <text x="0" y="54" class="small t-muted">at irregular times</text>
       <line x1="150" y1="60" x2="870" y2="60" class="s-grid"/>
       <g id="ing-readings"></g>
-
       <line x1="510" y1="88" x2="510" y2="112" class="s-muted" marker-end="url(#m-c)"/>
-      <text x="520" y="104" class="small t-muted">drop_stale_readings, then one row per 5 minutes</text>
-
-      <text x="0" y="140" class="eyebrow bold">slots.csv</text>
+      <text x="520" y="104" class="small t-muted">drop stale readings, then one row per 5 minutes</text>
+      <text x="0" y="140" class="bold">slots.csv</text>
       <text x="0" y="158" class="small t-muted">slot_window_used_pct</text>
       <text x="0" y="172" class="small t-muted">(how much it moved)</text>
-      <!-- bot run interval 25..35 min → x 600..780 -->
-      <rect x="600" y="122" width="180" height="140" class="f-bot-soft" style="opacity:.6"/>
-      <text x="690" y="136" text-anchor="middle" class="small t-bot bold">bot run interval</text>
       <g id="ing-slots"></g>
       <line x1="150" y1="240" x2="870" y2="240" class="s-line"/>
       <g id="ing-axis"></g>
-
-      <text x="0" y="300" class="eyebrow bold">split</text>
-      <rect x="150" y="288" width="14" height="14" class="f-human"/><text x="170" y="300" class="small">slot_window_human_pct (no bot running)</text>
-      <rect x="450" y="288" width="14" height="14" class="f-bot"/><text x="470" y="300" class="small">slot_window_bot_pct (our run, no human signal)</text>
-      <text x="150" y="322" class="small t-muted">Both running at once is rare by design; then the split is apportioned or kept as a lo/hi range (attribution = apportioned / censored).</text>
     </svg>
     </div>
-    <figcaption>The meter only says "the account is at 23%", never who spent it. Ingest makes three things that prediction cannot do without: a regular 5-minute table (so "the last 30 minutes" is 6 rows), stale readings removed (a lower value than one already seen in the window), and each slot's movement split into human and bot using our own run intervals.</figcaption>
+    <figcaption>A reading lower than one already seen in the same window is stale and dropped. Since 2026-10-06 the same rule applies to the week meter. Human and bot are no longer told apart here: on the VM, the bot's spend is simply what the VM ran.</figcaption>
   </figure>
+
+  <h3>Why the week meter needs the rule too</h3>
   <div class="tbl"><table>
-    <thead><tr><th>Column in slots.csv</th><th>Unit</th><th>Used by</th></tr></thead>
+    <thead><tr><th>2026-10-04</th><th>Source</th><th>Window</th><th>Week as read</th><th>Week kept (never decreases)</th></tr></thead>
     <tbody>
-      <tr><td><code>slot_window_human_pct</code></td><td>% of the 5-hour meter, during the slot</td><td>predict: the user's pace</td></tr>
-      <tr><td><code>was_human_active</code></td><td>bool</td><td>predict: the active-human floor, before the meter ticks</td></tr>
-      <tr><td><code>window_used_pct</code>, <code>window_end_ts</code></td><td>%, epoch s</td><td>predict and budget: the running window</td></tr>
+      <tr><td class="num">10:32:42</td><td>poller</td><td class="num">14</td><td class="num">21</td><td class="num">21</td></tr>
+      <tr><td class="num">10:34:37</td><td>status line</td><td class="num">15</td><td class="num" style="color:var(--lost)"><b>20</b></td><td class="num">21</td></tr>
+      <tr><td class="num">10:36:49</td><td>poller</td><td class="num">17</td><td class="num">21</td><td class="num">21</td></tr>
+      <tr><td class="num">10:37:10</td><td>status line</td><td class="num">17</td><td class="num">21</td><td class="num">21</td></tr>
+    </tbody></table></div>
+  <p class="muted">Two Claude sources read seconds apart disagree by one point, the poller always ahead — most likely the message headers truncate (20.7 → 20) while the API rounds (20.7 → 21). Without the rule, every round trip counted again: 111% of weekly movement for a week that peaked at 73%.</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th>What ingest keeps</th><th>Unit</th><th>Used by</th></tr></thead>
+    <tbody>
+      <tr><td><code>window_used_pct</code>, <code>window_end_ts</code></td><td>%, epoch s</td><td>budget: the running window</td></tr>
       <tr><td><code>week_used_pct</code>, <code>week_end_ts</code></td><td>% of the 7-day meter, epoch s</td><td>budget: what is left of the week</td></tr>
-      <tr><td><code>slot_n_readings</code></td><td>count</td><td>tells "Mac asleep" from "idle" from "measured"</td></tr>
+      <tr><td><code>slot_window_used_pct</code> and each week's peak</td><td>%</td><td>budget: <code>week_capacity_units</code></td></tr>
+      <tr><td>meter movement while the bot was idle</td><td>bool</td><td>plan: is the user active?</td></tr>
     </tbody></table></div>
 </section>
 
@@ -513,7 +560,6 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
   <figure>
     <div class="scroll">
     <svg class="wide" viewBox="0 0 900 170" role="img" aria-label="The last 15 hours before the weekly reset. With windows kept open, three windows fit. With a 3-hour gap where none runs, only two fit and up to one unit is lost.">
-      <!-- 15 h over 720px from x=150 → 48 px/h -->
       <line x1="870" y1="16" x2="870" y2="130" class="s-line" style="stroke-width:2"/>
       <text x="870" y="148" text-anchor="end" class="mono small">week_end_ts</text>
       <text x="0" y="48" class="bold">Always open</text>
@@ -531,7 +577,7 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
       <text x="150" y="160" class="small t-lost">up to 1 unit ≈ $32 lost ≈ 11% of the week</text>
     </svg>
     </div>
-    <figcaption>Budget's <code>remaining_windows</code> assumes a new window starts 5 minutes after the last one ends. A window only exists once a message opens it, so this stage sends a minimal <code>"ok"</code> whenever none is open. An opening costs about $0.02, and an open but unused window costs nothing. On Codex the same message also starts the 7-day period.</figcaption>
+    <figcaption>A window only exists once a message opens it, so this stage sends a minimal <code>"ok"</code> whenever none is open: about $0.02, while an open but unused window costs nothing. On the VM it can do this at night, which a sleeping Mac cannot. On Codex the same message also starts the 7-day period.</figcaption>
   </figure>
 </section>
 
@@ -543,44 +589,45 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
   <div class="io">
     <div><div class="eyebrow">Needs</div><ul>
       <li><code>extra_quota_to_spend_units</code>, <code>spend_by_ts</code> from budget</li>
-      <li><code>predicted_p95_human_usage_pct</code>, <code>window_used_pct</code>: a last clamp</li>
+      <li>the bot's measured burn rate</li>
+      <li>is the user active (last 30 min)?</li>
       <li><code>config.json</code>: repo list and weights, <code>QUIET_HOURS</code></li></ul></div>
     <div><div class="eyebrow">Gives (the mandate)</div><ul>
-      <li><code>amount</code>: the units to spend, after the clamp</li>
+      <li><code>amount</code>: what budget gave, or 0 while the user is active</li>
       <li><code>start_after</code> = <code>spend_by_ts</code> − lead time</li>
-      <li>profile, max workers, and a ranked queue of (repo, task) pairs</li></ul></div>
+      <li>profile, max workers, and a ranked queue of (repo, task) pairs, each sized in dollars (Claude) or tokens (Codex)</li></ul></div>
   </div>
   <figure>
     <div class="scroll">
-    <svg class="wide" viewBox="0 0 900 200" role="img" aria-label="Within one window: the burst profile waits and starts 1 hour 21 minutes before spend_by_ts; the gentle profile, used in quiet hours, starts right away and trickles.">
-      <!-- window 300 min over 720 px from x=150 → 2.4 px/min ; spend_by_ts at 295 min → x=858 -->
-      <line x1="150" y1="150" x2="870" y2="150" class="s-line"/>
-      <text x="150" y="168" class="mono small">now (window open)</text>
-      <line x1="858" y1="20" x2="858" y2="156" class="s-line dash"/>
-      <text x="858" y="168" text-anchor="end" class="mono small">spend_by_ts</text>
-      <line x1="870" y1="20" x2="870" y2="156" class="s-line"/>
-      <text x="870" y="186" text-anchor="end" class="mono small t-muted">window_end_ts</text>
+    <svg class="wide" viewBox="0 0 900 220" role="img" aria-label="Within one window: the burst profile checks that the user is not active, then starts 1 hour 8 minutes before spend_by_ts; the gentle profile, used in quiet hours on the VM, starts right away and trickles.">
+      <line x1="150" y1="160" x2="870" y2="160" class="s-line"/>
+      <text x="150" y="178" class="mono small">window opens</text>
+      <line x1="858" y1="20" x2="858" y2="166" class="s-line dash"/>
+      <text x="858" y="178" text-anchor="end" class="mono small">spend_by_ts</text>
+      <line x1="870" y1="20" x2="870" y2="166" class="s-line"/>
+      <text x="870" y="198" text-anchor="end" class="mono small t-muted">window_end_ts</text>
 
-      <text x="0" y="52" class="bold">burst</text><text x="0" y="68" class="small t-muted">day hours</text>
-      <rect x="150" y="38" width="514" height="26" class="f-soft"/>
-      <text x="407" y="56" text-anchor="middle" class="small t-muted">waits: the user keeps the window</text>
-      <rect x="664" y="38" width="194" height="26" class="f-bot"/>
-      <text x="761" y="56" text-anchor="middle" class="small bold" style="fill:var(--surface)">burns 0.9 at 1.0 unit/h</text>
-      <line x1="664" y1="30" x2="664" y2="72" class="s-line" style="stroke-width:2"/>
-      <text x="664" y="24" text-anchor="middle" class="mono small">start_after</text>
+      <text x="0" y="62" class="bold">burst</text><text x="0" y="78" class="small t-muted">day hours</text>
+      <rect x="150" y="48" width="544" height="26" class="f-soft"/>
+      <text x="422" y="66" text-anchor="middle" class="small t-muted">waits: the user keeps the window</text>
+      <rect x="694" y="48" width="164" height="26" class="f-bot"/>
+      <text x="776" y="66" text-anchor="middle" class="small bold" style="fill:var(--surface)">burns 0.75 at 1 unit/h</text>
+      <line x1="694" y1="40" x2="694" y2="82" class="s-line" style="stroke-width:2"/>
+      <text x="694" y="32" text-anchor="middle" class="mono small">start_after</text>
+      <circle cx="694" cy="98" r="8" class="f-human"/>
+      <text x="706" y="102" class="small t-human">user active? then wait</text>
 
-      <text x="0" y="112" class="bold">gentle</text><text x="0" y="128" class="small t-muted">QUIET_HOURS</text>
-      <rect x="150" y="98" width="708" height="26" class="f-bot-soft"/>
-      <rect x="150" y="98" width="708" height="26" class="s-bot"/>
-      <text x="504" y="116" text-anchor="middle" class="small">1 cheap worker at 0.2 unit/h, from the start: lead time 6 h 45 is longer than the window</text>
+      <text x="0" y="132" class="bold">gentle</text><text x="0" y="148" class="small t-muted">QUIET_HOURS</text>
+      <rect x="150" y="118" width="708" height="26" class="f-bot-soft"/>
+      <rect x="150" y="118" width="708" height="26" class="s-bot"/>
+      <text x="504" y="136" text-anchor="middle" class="small">1 cheap worker at 0.2 unit/h, from the start: lead time 5 h 37 is longer than the window</text>
     </svg>
     </div>
-    <figcaption>Lead time = <code>amount</code> ÷ intended rate × 1.5 safety. This is the only decision that can put the bot in the user's way, so in the day it starts as late as it can still finish and burns hard: a collision is bounded to the last hour of a window. At night there is nobody to collide with, so a slow, cheap trickle is fine.</figcaption>
+    <figcaption>Lead time = <code>amount</code> ÷ burn rate × 1.5. In the day the bot starts as late as it can still finish, and only if the user has been idle for 30 minutes. At night, on the VM, there is nobody to collide with, so a slow cheap trickle is fine.</figcaption>
   </figure>
-  <div class="formula">amount = min( extra_quota_to_spend_units,
-              (100 − window_used_pct − predicted_p95_human_usage_pct) / 100,
-              MAX_DAILY_UNITS − units spent today )</div>
-  <p class="muted"><code>amount</code> and <code>start_after</code> are planning's own field names and are not in VOCABULARY.md yet.</p>
+  <div class="formula">amount = extra_quota_to_spend_units     if the user has been idle for 30 minutes
+       = 0                              otherwise</div>
+  <p class="muted"><code>amount</code> and <code>start_after</code> are planning's own field names and are not in VOCABULARY.md yet. The forecast clamp and <code>MAX_DAILY_UNITS</code> were removed on 2026-10-06.</p>
 </section>
 
 <!-- ============ EXECUTE ============ -->
@@ -588,16 +635,15 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
   <div class="stage-head"><div class="stage-no">6</div>
     <div><h2>Execute <span class="badge todo">design only · P4</span></h2>
     <div class="q">Run the queue until the amount is spent or something says stop.</div></div></div>
+  <div class="note info"><b>First deliverable: the bot's burn rate</b>, per agent, with 1, 2 and 3 parallel workers. It decides whether the no-forecast rule stands (<a href="#protect">above</a>).</div>
   <figure>
     <div class="scroll">
-    <svg class="wide" viewBox="0 0 900 230" role="img" aria-label="Two workers run read-only tasks on different repos between start_after and spend_by_ts while the window meter rises; launching stops when the meter crosses the GUARD_PCT line.">
-      <!-- time 0..90 min over 720 px from x=150 → 8 px/min -->
+    <svg class="wide" viewBox="0 0 900 220" role="img" aria-label="Two workers run read-only tasks on different repos between start_after and spend_by_ts while the window meter rises until the amount is reached.">
       <line x1="150" y1="20" x2="150" y2="186" class="s-line"/>
       <text x="150" y="204" text-anchor="middle" class="mono small">start_after</text>
       <line x1="870" y1="20" x2="870" y2="186" class="s-line dash"/>
       <text x="870" y="204" text-anchor="end" class="mono small">spend_by_ts</text>
       <line x1="150" y1="186" x2="870" y2="186" class="s-line"/>
-
       <text x="0" y="44" class="bold">worker 1</text>
       <rect x="152" y="30" width="190" height="22" rx="3" class="f-bot"/><text x="160" y="45" class="small" style="fill:var(--surface)">agent-statusline · bugs</text>
       <rect x="350" y="30" width="230" height="22" rx="3" class="f-bot"/><text x="358" y="45" class="small" style="fill:var(--surface)">bootstrap-home · tests</text>
@@ -605,36 +651,36 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
       <text x="0" y="78" class="bold">worker 2</text>
       <rect x="152" y="64" width="250" height="22" rx="3" class="f-bot"/><text x="160" y="79" class="small" style="fill:var(--surface)">agent-usage-tracker · agent-docs</text>
       <rect x="410" y="64" width="200" height="22" rx="3" class="f-bot"/><text x="418" y="79" class="small" style="fill:var(--surface)">agent-auto-resume · bugs</text>
-
-      <!-- meter line -->
-      <text x="0" y="128" class="small t-muted">window_used_pct</text>
-      <line x1="150" y1="120" x2="870" y2="120" class="s-lost dash"/>
-      <text x="866" y="114" text-anchor="end" class="mono small t-lost">GUARD_PCT: stop launching, stop newest worker</text>
-      <polyline points="150,176 250,170 350,160 450,150 550,140 650,130 738,124" class="s-bot" style="stroke-width:2"/>
+      <text x="0" y="148" class="small t-muted">window_used_pct</text>
+      <line x1="150" y1="118" x2="870" y2="118" class="s-human dash"/>
+      <text x="866" y="112" text-anchor="end" class="mono small t-human">75%: the user's 25% is never touched</text>
+      <polyline points="150,176 250,168 350,158 450,148 550,138 650,128 738,124" class="s-bot" style="stroke-width:2"/>
       <circle cx="738" cy="124" r="4" class="f-bot"/>
       <text x="744" y="146" class="small">amount reached: stop</text>
     </svg>
     </div>
-    <figcaption>One supervisor runs a small pool of workers, at most one task per repo. Each worker is a read-only <code>claude -p</code> or <code>codex exec</code> that writes a Markdown report. Spend is measured on the meter, never in dollars. The run records its intervals so ingest can label those slots as bot.</figcaption>
+    <figcaption>One supervisor runs a small pool of workers, at most one task per repo. Each worker is a read-only <code>claude -p</code> or <code>codex exec</code> that writes a Markdown report. Spend is measured on the meter, never in dollars.</figcaption>
   </figure>
   <div class="tbl"><table>
     <thead><tr><th>Stops when</th><th>What happens</th></tr></thead>
     <tbody>
       <tr><td><code>amount</code> spent</td><td>no new launch; running workers finish</td></tr>
+      <tr><td>a task would not fit what is left</td><td>it is not started</td></tr>
       <tr><td><code>spend_by_ts</code> reached</td><td>no new launch; workers get a grace period, then are stopped</td></tr>
-      <tr><td>window above the <code>GUARD_PCT</code> line</td><td>no new launch; newest workers stopped first</td></tr>
       <tr><td><code>config.json</code> disabled</td><td>everything stops at once</td></tr>
     </tbody></table></div>
+  <p class="muted"><code>GUARD_PCT</code> was removed on 2026-10-06: it did the 25% reserve's job a second time.</p>
 </section>
 
-<!-- ============ GAPS ============ -->
-<section id="gaps">
-  <div class="eyebrow">Open points the diagrams make visible</div>
-  <h2>Known gaps</h2>
+<!-- ============ OPEN ============ -->
+<section id="open">
+  <div class="eyebrow">Still open</div>
+  <h2>Open questions</h2>
   <div class="stack">
-    <div class="note"><b>Horizon ignored by budget.</b> With 240 minutes left in the window, the forecast covers only 120 (<code>predicted_horizon_minutes</code>), but budget uses <code>predicted_p95_human_usage_pct</code> as the reserve for the whole window. The last two hours have no forecast, so the reserve is too small.</div>
-    <div class="note"><b>Budget fills past the guard.</b> Budget fills a window up to 90% (<code>MIN_HUMAN_RESERVE_PCT</code> 10), but execute stops workers above 85% (<code>GUARD_PCT</code> 15). The last 5 points of every full window cannot be spent.</div>
-    <div class="note"><b><code>BOT_BURN_UNITS_PER_HOUR</code> is a guess (1.0).</b> It sets <code>max_spend_units_by_time</code> and the lead time. If it is too high, the bot underspends; it never collides. P4 measures it.</div>
+    <div class="note"><b>The bot's burn rate is not measured.</b> It decides whether the rule is enough or the forecast comes back. Execution measures it first.</div>
+    <div class="note"><b>Is the VM's Claude login the same account as the Mac's?</b> It is a Pro login; that it is the same account is still to confirm.</div>
+    <div class="note"><b>The VM needs its own meter reader.</b> Either <code>agent-usage-tracker</code>'s pollers deployed there, preferred, or <code>aqm</code> calling the two endpoints itself.</div>
+    <div class="note"><b>Noticing a user who starts working during a run.</b> While the bot runs, the meter moves for both. Options: a short pause between tasks to watch the meter, comparing the meter with the bot's own cost, or the Mac signalling the VM. Needed only if the bot is slow.</div>
   </div>
 </section>
 
@@ -650,23 +696,94 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
     return e;
   }
 
-  /* ---- prediction past slots: deterministic human pct per slot ---- */
+  /* ---- sleep grid: minutes awake per hour, pmset, week of 2026-09-29 ---- */
   (function () {
-    var g = document.getElementById("pred-bars");
-    // 47 slots before now (238 min); last 6 = last_30_min; scale 10 px per %
-    var vals = [0,1,0,2,1,0,0,2,1,0, 0,1,0,0,1,0,0,0,2,1, 0,1,0,0,0,0,0,1,0,1, 0,0,2,0,0,0,0,0,0,2, 0,  2,3,2,1,2,2];
-    var pxm = 800 / 300;
-    for (var i = 0; i < vals.length; i++) {
-      var x0 = 60 + i * 5 * pxm + 0.6, w = 5 * pxm - 1.2, h = vals[i] * 18;
-      if (h > 0) g.appendChild(el("rect", { x: x0.toFixed(1), y: (170 - h).toFixed(1), width: w.toFixed(1), height: h, "class": "f-human" }));
-    }
+    var svg = document.getElementById("sleep-svg");
+    var days = [
+      ["Tue 09-29", [0,0,0,0,0,0,0,0,0,3,60,60,60,60,60,60,60,60,60,60,60,60,60,60]],
+      ["Wed 09-30", [60,60,60,60,60,60,60,60,60,60,0,35,60,60,51,60,60,60,60,60,60,60,37,0]],
+      ["Thu 10-01", [0,0,0,0,0,0,0,0,10,54,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],
+      ["Fri 10-02", [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,60,60,60,60,60,60,59,44]],
+      ["Sat 10-03", [0,0,0,0,0,0,0,0,17,60,60,60,60,60,60,60,60,60,60,60,60,60,50,0]],
+      ["Sun 10-04", [0,0,0,0,0,0,0,0,0,56,60,60,60,60,60,58,0,0,0,17,60,60,60,55]],
+      ["Mon 10-05", [0,0,0,0,0,0,0,0,29,60,40,45,60,60,60,60,60,60,60,33,0,0,0,0]]];
+    var x0 = 96, y0 = 30, cw = 26, ch = 22, gap = 2;
+    for (var h = 0; h < 24; h += 3) svg.appendChild(el("text", { x: x0 + h * cw + cw / 2, y: 20, "text-anchor": "middle", "class": "mono small t-muted" }, String(h).padStart(2, "0") + "h"));
+    days.forEach(function (d, r) {
+      var y = y0 + r * (ch + gap);
+      svg.appendChild(el("text", { x: 0, y: y + 15, "class": "mono small" }, d[0]));
+      d[1].forEach(function (m, h) {
+        var x = x0 + h * cw;
+        svg.appendChild(el("rect", { x: x, y: y, width: cw - gap, height: ch, rx: 2, "class": "f-soft" }));
+        if (m > 0) svg.appendChild(el("rect", { x: x, y: y, width: cw - gap, height: ch, rx: 2, "class": "f-human", "fill-opacity": (0.15 + 0.85 * m / 60).toFixed(2) }));
+      });
+    });
+    // the 24 h before the Claude reset (Mon 21:00): Sun 21-24 and Mon 0-21
+    svg.appendChild(el("rect", { x: x0 + 21 * cw - 1, y: y0 + 5 * (ch + gap) - 1, width: 3 * cw, height: ch + 2, "class": "s-bot", style: "stroke-width:2" }));
+    svg.appendChild(el("rect", { x: x0 - 1, y: y0 + 6 * (ch + gap) - 1, width: 21 * cw, height: ch + 2, "class": "s-bot", style: "stroke-width:2" }));
+    svg.appendChild(el("text", { x: x0, y: y0 + 7 * (ch + gap) + 22, "class": "small t-bot bold" }, "outlined: the 24 h before the Claude weekly reset (Mon 21:00)"));
+    svg.appendChild(el("rect", { x: 520, y: y0 + 7 * (ch + gap) + 10, width: 14, height: 14, rx: 2, "class": "f-human" }));
+    svg.appendChild(el("text", { x: 540, y: y0 + 7 * (ch + gap) + 22, "class": "small" }, "awake (darker = more minutes)"));
+  })();
+
+  /* ---- waste left: Mac vs always-on ---- */
+  (function () {
+    var g = document.getElementById("waste-bars");
+    var rows = [["Claude · on the Mac", 41, "f-lost"], ["Claude · on the VM", 1, "f-bot"], ["Codex · on the Mac", 36, "f-lost"], ["Codex · on the VM", 0, "f-bot"]];
+    rows.forEach(function (r, i) {
+      var y = 32 + i * 28;
+      g.appendChild(el("text", { x: 0, y: y + 14, "class": "small" }, r[0]));
+      g.appendChild(el("rect", { x: 200, y: y, width: 500, height: 18, "class": "f-soft" }));
+      if (r[1] > 0) g.appendChild(el("rect", { x: 200, y: y, width: Math.max(2, r[1] * 5), height: 18, "class": r[2] }));
+      g.appendChild(el("text", { x: 206 + r[1] * 5, y: y + 14, "class": "mono small bold" }, r[1] + "%"));
+    });
+  })();
+
+  /* ---- measured units per week ---- */
+  (function () {
+    var g = document.getElementById("cap-bars");
+    var weeks = [["08-31", 10.09, "promo"], ["09-14", 9.15], ["09-21", 8.21], ["09-28", 7.26], ["10-05", 7.61]];
+    var base = 170, k = 13;
+    g.appendChild(el("line", { x1: 70, y1: base, x2: 700, y2: base, "class": "s-line" }));
+    weeks.forEach(function (w, i) {
+      var x = 110 + i * 120, h = w[1] * k;
+      g.appendChild(el("rect", { x: x, y: base - h, width: 60, height: h, "class": "f-human" }));
+      g.appendChild(el("text", { x: x + 30, y: base - h - 6, "text-anchor": "middle", "class": "mono small bold" }, w[1].toFixed(1)));
+      g.appendChild(el("text", { x: x + 30, y: base + 16, "text-anchor": "middle", "class": "mono small" }, "week " + w[0] + (w[2] ? " (" + w[2] + ")" : "")));
+    });
+    var y = base - 8.85 * k;
+    g.appendChild(el("line", { x1: 70, y1: y, x2: 700, y2: y, "class": "s-lost dash", style: "stroke-width:2" }));
+    g.appendChild(el("text", { x: 700, y: y - 6, "text-anchor": "end", "class": "small t-lost bold" }, "8.85: hard-coded until 2026-10-06"));
+    g.appendChild(el("text", { x: 0, y: 20, "class": "bold" }, "Units per Claude week, measured"));
+  })();
+
+  /* ---- risk: active vs not ---- */
+  (function () {
+    var g = document.getElementById("risk-bars");
+    var data = [["1 h", 19, 2], ["1.5 h", 28, 3], ["3 h", 45, 7], ["5 h", 52, 13]];
+    var base = 190, k = 2.6;
+    g.appendChild(el("line", { x1: 60, y1: base, x2: 720, y2: base, "class": "s-line" }));
+    data.forEach(function (d, i) {
+      var cx = 150 + i * 160;
+      [[d[1], "f-human", -46], [d[2], "f-human-soft", 4]].forEach(function (b) {
+        var h = b[0] * k;
+        g.appendChild(el("rect", { x: cx + b[2], y: base - h, width: 42, height: Math.max(1, h), "class": b[1] }));
+        g.appendChild(el("text", { x: cx + b[2] + 21, y: base - h - 6, "text-anchor": "middle", "class": "mono small bold" }, b[0] + "%"));
+      });
+      g.appendChild(el("text", { x: cx, y: base + 18, "text-anchor": "middle", "class": "small" }, "within " + d[0]));
+    });
+    g.appendChild(el("rect", { x: 60, y: 14, width: 14, height: 14, "class": "f-human" }));
+    g.appendChild(el("text", { x: 80, y: 26, "class": "small" }, "the user was active in the last 30 min"));
+    g.appendChild(el("rect", { x: 330, y: 14, width: 14, height: 14, "class": "f-human-soft" }));
+    g.appendChild(el("text", { x: 350, y: 26, "class": "small" }, "not active"));
+    g.appendChild(el("text", { x: 60, y: base + 44, "class": "small t-muted" }, "chance the user uses more than 25% of a window"));
   })();
 
   /* ---- ingestion figure ---- */
   (function () {
     var X = function (m) { return 150 + m * 18; };
     var gr = document.getElementById("ing-readings");
-    var reads = [[1,20],[7,21],[9,19,1],[14,23],[22,23],[26,27],[33,28],[38,30]];
+    var reads = [[1, 20], [7, 21], [9, 19, 1], [14, 23], [22, 23], [26, 27], [33, 28], [38, 30]];
     reads.forEach(function (r) {
       var x = X(r[0]);
       if (r[2]) {
@@ -680,34 +797,34 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
       }
     });
     var gs = document.getElementById("ing-slots"), ga = document.getElementById("ing-axis");
-    var d = [0,1,2,0,0,4,1,2], who = ["h","h","h","h","h","b","b","h"], n = [1,1,1,0,1,1,1,1];
+    var d = [0, 1, 2, 0, 0, 4, 1, 2], n = [1, 1, 1, 0, 1, 1, 1, 1];
     for (var i = 0; i < 8; i++) {
       var x = X(i * 5) + 3, w = 5 * 18 - 6, h = d[i] * 22;
       gs.appendChild(el("rect", { x: x, y: 150, width: w, height: 90, "class": "s-grid" }));
-      if (h > 0) gs.appendChild(el("rect", { x: x, y: 240 - h, width: w, height: h, "class": who[i] === "b" ? "f-bot" : "f-human" }));
+      if (h > 0) gs.appendChild(el("rect", { x: x, y: 240 - h, width: w, height: h, "class": "f-human" }));
       gs.appendChild(el("text", { x: x + w / 2, y: 236 - h, "text-anchor": "middle", "class": "mono small bold" }, "+" + d[i]));
       ga.appendChild(el("text", { x: x + w / 2, y: 256, "text-anchor": "middle", "class": "mono small t-muted" }, "n=" + n[i]));
     }
-    ga.appendChild(el("text", { x: 150, y: 272, "class": "small t-muted" }, "slot_n_readings per slot (n=0: no reading arrived)"));
+    ga.appendChild(el("text", { x: 150, y: 278, "class": "small t-muted" }, "slot_n_readings per slot (n=0: no reading arrived)"));
   })();
 
   /* ---- interactive backwards fill ---- */
   var H = document.getElementById("bf-h"), W = document.getElementById("bf-w");
   var svg = document.getElementById("bf-svg");
-  var OPEN_LEFT_H = 4.8, OPEN_USED = 5, MIN_RES = 10, GAP_H = 5 / 60, BURN = 1.0, MARGIN_H = 5 / 60;
+  var OPEN_LEFT_H = 4.8, OPEN_USED = 5, RESERVE = 25, GAP_H = 5 / 60, BURN = 1.0, MARGIN_H = 5 / 60, CAPACITY = 7.6;
   function hm(h) { var t = Math.round(h * 60); return Math.floor(t / 60) + " h " + String(t % 60).padStart(2, "0"); }
   function draw() {
     var hours = parseFloat(H.value), left = parseFloat(W.value);
     document.getElementById("bf-h-out").textContent = hm(hours);
     document.getElementById("bf-w-out").textContent = left.toFixed(2);
-    // remaining_windows
     var wins = [], s = 0, first = true;
     while (s < hours - 1e-9) {
-      var e = Math.min(s + (first ? OPEN_LEFT_H : 5), hours);
-      var dur = e - s;
-      var byQ = (100 - MIN_RES - (first ? OPEN_USED : 0)) / 100;
-      var byT = dur * BURN;
-      wins.push({ s: s, e: e, max: Math.max(0, Math.min(byQ, byT)), lim: byQ <= byT ? "quota" : "time", split: e >= hours - 1e-9 && dur < (first ? OPEN_LEFT_H : 5) - 1e-9, open: first });
+      var fullStart = first ? s - (5 - OPEN_LEFT_H) : s, fullEnd = fullStart + 5;
+      var e = Math.min(fullEnd, hours);
+      var share = fullEnd > hours ? (hours - fullStart) / 5 : 1;       // the window that outlives the reset
+      var byQ = ((100 - RESERVE) * share - (first ? OPEN_USED : 0)) / 100;
+      var byT = (e - s) * BURN;
+      wins.push({ s: s, e: e, max: Math.max(0, Math.min(byQ, byT)), open: first, straddle: share < 1 });
       s = e + GAP_H; first = false;
     }
     var rem = left;
@@ -715,13 +832,12 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
     rem = Math.max(0, rem);
 
     while (svg.firstChild) svg.removeChild(svg.firstChild);
-    var x0 = 60, x1 = 860, base = 170, top = 40, unitPx = (base - top) / 1.0;
+    var x0 = 60, x1 = 860, base = 170, unitPx = 130;
     var X = function (h) { return x0 + (h / hours) * (x1 - x0); };
-    // gridline at 1 unit and 0.9
     svg.appendChild(el("line", { x1: x0, y1: base - unitPx, x2: x1, y2: base - unitPx, "class": "s-grid" }));
     svg.appendChild(el("text", { x: x0 - 6, y: base - unitPx + 4, "text-anchor": "end", "class": "mono small t-muted" }, "1 unit"));
     svg.appendChild(el("text", { x: x0 - 6, y: base + 4, "text-anchor": "end", "class": "mono small t-muted" }, "0"));
-    wins.forEach(function (w, i) {
+    wins.forEach(function (w) {
       var a = X(w.s) + 1, b = X(w.e) - 1, ww = Math.max(1, b - a);
       var hMax = w.max * unitPx, hPlan = w.plan * unitPx;
       svg.appendChild(el("rect", { x: a, y: base - hMax, width: ww, height: hMax, "class": "f-soft" }));
@@ -730,17 +846,13 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
       if (hPlan > 0 && !w.open) svg.appendChild(el("rect", { x: a, y: base - hPlan, width: ww, height: hPlan, "class": "s-bot" }));
       if (ww > 34) svg.appendChild(el("text", { x: a + ww / 2, y: base - hMax - 6, "text-anchor": "middle", "class": "mono small" }, w.plan.toFixed(2)));
     });
-    // axis
     svg.appendChild(el("line", { x1: x0, y1: base, x2: x1, y2: base, "class": "s-line" }));
     svg.appendChild(el("line", { x1: x1, y1: 22, x2: x1, y2: base + 6, "class": "s-line", style: "stroke-width:2" }));
     svg.appendChild(el("text", { x: x1, y: 16, "text-anchor": "end", "class": "mono small" }, "week_end_ts"));
     svg.appendChild(el("text", { x: x0, y: base + 18, "class": "mono small bold t-bot" }, "now · running window"));
     svg.appendChild(el("text", { x: x0, y: 16, "class": "small t-muted" }, "planned_units per window (outline = max_spend_units)"));
-    // fill-order arrow
     svg.appendChild(el("text", { x: (x0 + x1) / 2, y: base + 18, "text-anchor": "middle", "class": "small t-muted" }, "← filled in this order, starting from the reset"));
-
-    // week.left_units bar
-    var by = 210, scale = (x1 - x0) / 8.85, cx = x0;
+    var by = 210, scale = (x1 - x0) / CAPACITY, cx = x0;
     svg.appendChild(el("text", { x: x0, y: by - 6, "class": "small t-muted" }, "where week.left_units goes"));
     wins.forEach(function (w) {
       if (w.plan <= 0) return;
@@ -755,7 +867,7 @@ predicted_p95_human_usage_pct = rate × predicted_horizon_minutes × SAFETY_MULT
       if (rem * scale > 110) svg.appendChild(el("text", { x: cx + rem * scale / 2, y: by + 14, "text-anchor": "middle", "class": "small t-lost bold" }, "already_lost_units"));
     }
     svg.appendChild(el("text", { x: x0, y: by + 40, "class": "mono small t-muted" }, "0"));
-    svg.appendChild(el("text", { x: x1, y: by + 40, "text-anchor": "end", "class": "mono small t-muted" }, "8.85 units = a full Claude week"));
+    svg.appendChild(el("text", { x: x1, y: by + 40, "text-anchor": "end", "class": "mono small t-muted" }, "7.6 units = a Claude week, as measured"));
 
     var now = wins.length ? wins[0].plan : 0;
     document.getElementById("bf-now").textContent = now.toFixed(2);
