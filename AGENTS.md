@@ -4,7 +4,7 @@
 
 Claude and Codex subscriptions meter usage in 5-hour windows nested inside 7-day periods, and both are use-it-or-lose-it. Measured over the last month on this machine, Claude leaves about $139 of its week unspent and Codex about $98 — Codex wastes the larger share, Claude the larger amount. This project runs read-only maintenance tasks (bug hunts, doc-drift checks, test-coverage reviews) across the repos in `~/dev`, **as late as possible** in each period, so the leftovers get spent and the user never queues behind a bot.
 
-Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the whole pipeline skeleton, including the LaunchAgent and `install.sh`. Stages 4–6 (the two that act, plus planning) are design only, so a tick cannot yet spend anything.** `release/aqm/` is the whole implementation, one module per stage (`design/07_pipeline/DESIGN.md` §12). A forecasting study on 42 days of real history (`design/02_prediction/DESIGN.md` §8) compared five engines and concluded that this one is already at its measured optimum; it moved `MIN_HUMAN_RESERVE_PCT` from 10% to 25% instead, which also settled the `GUARD_PCT` conflict. The next step is P3 (window starter) or P4 (execution) — see `design/DESIGN_v2.md` §6.
+Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the whole pipeline skeleton, including the LaunchAgent and `install.sh`. Stages 4–6 (the two that act, plus planning) are design only, so a tick cannot yet spend anything.** `release/aqm/` is the whole implementation, one module per stage (`design/07_pipeline/DESIGN.md` §12). A forecasting study on 42 days of real history (`design/02_prediction/DESIGN.md` §8) compared five engines and concluded that this one is already at its measured optimum; it moved `MIN_HUMAN_RESERVE_PCT` from 10% to 25% instead, which also settled the `GUARD_PCT` conflict. **Revised on 2026-10-06** (`design/DESIGN_v2.md` §8): replaying the whole decision over 42 days showed the forecast changes no outcome, so **stage 2 is parked** (kept, not deleted) and a fixed rule protects the user — start just in time, keep 25% of every window, never start while the user is active; the bot will run on the **Debian VM**, because the Mac sleeps most nights; `GUARD_PCT` and `MAX_DAILY_UNITS` are gone and the week's capacity is measured. The code catches up in P2b. The next step is P2b (the move to the VM), then P4, whose first deliverable is the bot's measured burn rate — see `design/DESIGN_v2.md` §6.
 
 ## Repository layout
 
@@ -14,7 +14,7 @@ Status: **P0–P2 built and verified: ingestion, prediction, budgeting and the w
 | [`design/`](design/) | Every design document, plus `PIPELINE_MAP.html`, the visual summary. No code, with one exception: [`02_prediction/`](design/02_prediction/lab/README.md) holds the forecasting bench — one notebook per candidate forecaster and the shared dataset they are all measured on, which belong beside the design question they investigate |
 | [`release/`](release/) | The implementation and what gets deployed: the `aqm/` package (one module per stage), the `aqm-cli` launcher, `install.sh`, `uninstall.sh`, the LaunchAgent plist, the `config.json` template |
 | [`test/`](test/) | Every test. Bash only, hermetic, no LLM is ever called ([`README`](test/README.md)) |
-| [`notebook/`](notebook/) | Ad-hoc analysis, run by hand. **`explain_budget.ipynb` takes one decision apart**, measurement by measurement ([`README`](notebook/README.md)) |
+| [`notebook/`](notebook/) | Ad-hoc analysis, run by hand. **`explain_budget.ipynb` takes one decision apart**, measurement by measurement; **`pipeline_replay.py` replays the whole decision** over the recorded history ([`README`](notebook/README.md)) |
 
 Four commands are runnable now:
 
@@ -38,7 +38,7 @@ Two environment variables place everything, which is why the tests need no fixtu
 Six stages, run every 5 minutes by a single LaunchAgent. Each stage is a CLI verb, reads the previous stage's artifact and writes its own, so any one can be run and inspected alone.
 
 ```
-ingest → predict → budget → start_windows → plan → execute
+ingest → budget → start_windows → plan → execute        (predict: parked 2026-10-06)
 ```
 
 The guiding principle is **postponement**: at every tick, work out how much of the remaining weekly quota cannot survive until the reset, and spend only that, at the last safe moment. Quota spent late is quota no later window could have absorbed, so the only way the system can get in the user's way is the time it needs to burn the amount — which is why lead time and burn rate, not lowered ceilings, are the levers.
@@ -149,7 +149,7 @@ About **45% of Claude slots and 68% of Codex ones have `is_window_open: false`**
 | What does a name mean, and in what unit? | `design/VOCABULARY.md` — the grammar is §1 |
 | Why is it built this way rather than another? | `design/CONSIDERATIONS.md`, then the stage's own DESIGN.md |
 | What is every CLI flag? | `design/07_pipeline/DESIGN.md` §1.1 |
-| What is the value of `MIN_HUMAN_RESERVE_PCT` / `GUARD_PCT` / any parameter? | `design/07_pipeline/DESIGN.md` §11 |
+| What is the value of `MIN_HUMAN_RESERVE_PCT` / `HUMAN_IDLE_MINUTES` / any parameter? | `design/07_pipeline/DESIGN.md` §11 |
 | What runs when, and what stops it? | `design/07_pipeline/DESIGN.md` §2, §4 |
 | How does Claude differ from Codex here? | `design/CLAUDE_AND_CODEX.md` §2 |
 | Which source gives percent / tokens / USD, and where exactly? | `~/dev/agent-usage-tracker/USAGE_DATA_SOURCES.md` (what exists upstream) and `~/dev/agent-usage-tracker/USAGE_DATA_REFERENCE.md` (what agent-usage-tracker captures, and where) |

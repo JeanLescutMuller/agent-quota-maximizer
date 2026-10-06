@@ -139,6 +139,7 @@ td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); white-s
   <div class="eyebrow">agent-quota-maximizer · design map · names from design/VOCABULARY.md</div>
   <h1>Spend the quota that would expire, as late as possible</h1>
   <p>Every 5 minutes one tick runs six stages. Five of them only compute; two of them act. This page shows what each stage answers, what it needs from the stage before, and why.</p>
+  <div class="note"><b>Revised on 2026-10-06 — this page still shows the design before it.</b> Stage 2 (Predict) is parked: the budget keeps a fixed 25% of every window for the user, nothing starts while the user is active, and the window that outlives the weekly reset is only filled before it. The bot will run on the Debian VM, because the Mac sleeps most nights. Why, with the measurements: <code>design/DESIGN_v2.md</code> §8.</div>
 </header>
 
 <nav class="strip" aria-label="Stages">

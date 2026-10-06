@@ -118,6 +118,8 @@ Its only job is to separate three situations that all report a burn rate of zero
 
 ## 4. `artifacts/predictions/<date>/<time>.json`
 
+> **Parked on 2026-10-06** with stage 2 (`DESIGN_v2.md` §8): no decision reads this file any more. Its names are kept for the day it comes back.
+
 **The question this answers: how much of the 5-hour meter will the *user* still want
 before it resets?**
 
@@ -319,17 +321,18 @@ names.
 
 | Was | Name | What it is | Value |
 |---|---|---|---|
-| `MIN_MARGIN` | `MIN_HUMAN_RESERVE_PCT` | never fill a window past this; held for the user even when they look idle. Measured, not chosen (`02_prediction/DESIGN.md` §8) | `25` |
+| `MIN_MARGIN` | `MIN_HUMAN_RESERVE_PCT` | never fill a window past this; held for the user even when they look idle. Measured, not chosen (`02_prediction/DESIGN.md` §8). The only reserve since 2026-10-06 | `25` |
+| — | `HUMAN_IDLE_MINUTES` | **added 2026-10-06**: nothing starts while the user moved the meter or sent a prompt within this many minutes (`05_planning/DESIGN.md` §3) | `30` |
 | `WINDOW_GAP` | `WINDOW_GAP_SECONDS` | assumed gap between consecutive 5-hour windows | `300` |
 | `DEADLINE_MARGIN` | `DEADLINE_MARGIN_SECONDS` | stop this long before a window's reset | `300` |
 | `BURST_RATE` | `BOT_BURN_UNITS_PER_HOUR` | how fast our background work can burn quota. **Assumed, not yet measured** | `1.0` |
-| `RATE_WINDOW` | `BURN_LOOKBACK_MINUTES` | how far back `last_30_min` looks | `30` |
-| `PERSISTENCE_HOURS` | `PERSISTENCE_P95` | `SAFETY_MULTIPLIER` | turns an average rate into a 95th percentile | `1.5` |
-| `TRIPWIRE_RATE` | `ACTIVE_HUMAN_BURN_RATE` | assumed pace when the user is clearly working but the meter has not ticked | `0.15` |
+| `RATE_WINDOW` | `BURN_LOOKBACK_MINUTES` | how far back `last_30_min` looks. **Parked with stage 2** | `30` |
+| `PERSISTENCE_HOURS`, `PERSISTENCE_P95` | `SAFETY_MULTIPLIER` | turns an average rate into a 95th percentile. **Parked with stage 2** | `1.5` |
+| `TRIPWIRE_RATE` | `ACTIVE_HUMAN_BURN_RATE` | assumed pace when the user is clearly working but the meter has not ticked. **Parked with stage 2** | `0.15` |
 | `READING_MAX_AGE` | `READING_MAX_AGE_SECONDS` | a meter reading older than this refuses the spend | `600` |
-| `MAX_INPUT_AGE` | `ARTIFACT_MAX_AGE_SECONDS` | a forecast older than this is not trusted | `600` |
+| `MAX_INPUT_AGE` | `ARTIFACT_MAX_AGE_SECONDS` | a forecast older than this is not trusted. **Parked with stage 2** | `600` |
 | `TICK_INTERVAL` | `TICK_INTERVAL_SECONDS` | the LaunchAgent period | `300` |
-| `WEEK_UNITS` | `WEEK_CAPACITY_UNITS` | how many 5-hour meters fit in a week, per agent | claude `8.85`, codex `6.2` |
+| `WEEK_UNITS`, `WEEK_CAPACITY_UNITS` | `week_capacity_units` | how many 5-hour meters fit in a week, per agent. **Measured since 2026-10-06**, not configured, hence lower case (`03_budgeting/DESIGN.md` §2) | claude 7.6 on 2026-10-05 |
 | `ARTIFACT_RETENTION_DAYS`, `LOG_MAX_MB` | unchanged | housekeeping | `14`, `20` |
 
 ## 7. Functions

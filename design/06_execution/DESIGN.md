@@ -9,6 +9,8 @@ Stage 6, and the only one that spends real quota. A **supervisor with a worker p
 | Writes | Reports, `state/runs.jsonl`, `state/burnrate.jsonl`, `state/pairs.json` |
 | Acts | **Yes**, up to `amount` per agent |
 
+**Revised 2026-10-06** (`../DESIGN_v2.md` §8): it runs on the Debian VM; its first deliverable is the measured burn rate, which decides whether the no-forecast rule is enough; and `GUARD_PCT` is gone — making sure each task fits what it was given is this stage's own concern, handled by the reservation of §3, not a separate parameter.
+
 It takes no agent, amount or deadline: the plan already carries the mandate for every agent, so the supervisor has nothing to be told. Forcing a single task needs no flag — a one-line queue in `--plan` does it through the real code path. The pipeline spawns it detached (`Popen(start_new_session=True)`, output to `logs/executor.log`), so launchd never waits on a task.
 
 ## 1. The loop
@@ -20,7 +22,7 @@ for each agent in plan with amount ≥ MIN_TASK_BUDGET and now ≥ start_after:
 
 while any agent still has work and now < its deadline:
     reload config; if not enabled:                     stop all "disabled"
-    # room was computed at plan time and is not re-checked during the run (§5)
+    # whether the user was active was checked at plan time, not re-checked during the run (§5)
     pick the agent with the largest remaining fraction of its amount
     free = amount − spent_so_far[agent] − reserved[agent]
     if free < MIN_TASK_BUDGET:                         that agent is done
@@ -63,6 +65,8 @@ On Codex, read-only is a sandbox mode rather than a list of forbidden tools, whi
 
 ## 3. Budget with several workers in flight
 
+**The first thing this stage delivers is the burn rate**, before any of the rest is tuned: per agent, with 1, 2 and 3 parallel workers, in units per hour of meter movement. It decides the design (`../DESIGN_v2.md` §8.2): at 0.5 unit/h or more the no-forecast rule stands; below, more workers first, and if that is still not enough, prediction comes back.
+
 Overshoot risk multiplies with parallelism, so the budget is managed by **reservation**:
 
 - A task is launched only if `amount − spent − reserved ≥ MIN_TASK_BUDGET`.
@@ -77,38 +81,44 @@ Overshoot risk multiplies with parallelism, so the budget is managed by **reserv
 
 | Event                                                   | Behaviour                                                                                                                                        |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The meter shows less than `GUARD_PCT` of the window left | Stop launching, and terminate the newest workers first, being the ones with the least sunk cost. This is the only in-run protection in the MVP: it reacts to the meter, not to a forecast (§5) |
 | Deadline reached                                         | Stop launching; running workers get `GRACE`, then are terminated                                                                                 |
 | Budget exhausted                                         | Stop launching; running workers finish                                                                                                          |
 | Config disabled                                          | Stop launching and terminate all workers                                                                                                        |
 | Worker timeout (`TASK_TIMEOUT`)                          | Terminated; its partial spend still shows in the meter delta                                                                                    |
 | Two consecutive worker failures                          | Supervisor stops and records `last_error`                                                                                                       |
 
-## 5. Deferred: live room re-check
+## 5. Deferred: noticing a user who arrives during a run
 
-In the MVP the supervisor never re-reads the prediction. The room left for the user (`1 − window_used − p95`) is computed by the plan stage and frozen into `amount`, so a user who starts working two minutes into a twenty-minute task is not noticed until the run ends.
+The supervisor works to the frozen `amount`. Planning checks that the user is not active before anything starts (`../05_planning/DESIGN.md` §3), but a user who starts working two minutes into a twenty-minute task is not noticed until the run ends.
 
 What bounds the damage meanwhile:
 
 | Bound | Effect |
 |---|---|
 | `MIN_HUMAN_RESERVE_PCT` is never filled | Whatever happens, a slice of the window is left for the user |
-| `GUARD_PCT` on the meter | The one live check: when the window is nearly full, launching stops and the newest workers are killed |
 | `spend_by_ts` | The run cannot outlive the window it was planned for |
 | Late start | During the user's hours work begins as late as the burn rate allows, so the exposure window is short by construction (`../05_planning/DESIGN.md` §1) |
 | `TASK_TIMEOUT` | No single worker runs longer than 20 minutes |
 
-**The deferred feature:** `aqm execute --prediction PATH`, defaulting to `state/latest/prediction.json` re-read in the loop, so a fresh prediction written by any later tick reaches the running supervisor and stops it for that agent. The plan would still be read once — the mandate must not move — while the prediction deliberately would be a moving target. It is the single cheapest upgrade to user protection once the MVP runs, and it changes nothing else: the room expression and the stop rule already exist (`../05_planning/DESIGN.md` §3, §4 above).
+**Why it is harder on the VM.** While the bot runs, the meter moves for the bot and the user alike, and the VM cannot see the Mac's sessions. Three ways to notice the user, none chosen yet:
+
+| Way | Cost |
+|---|---|
+| Between two tasks, wait one meter poll with nothing running: any movement is the user | Throughput: a few idle minutes per task |
+| Compare the meter's movement with what the bot's own tasks cost, converted at the measured rate | The conversion varies ±30% between windows, so only a large excess is a reliable signal |
+| The Mac tells the VM: a status-line render means the user sent a prompt | Couples the two machines; nothing is heard while the Mac sleeps, which is also when the user is not at it |
+
+How much it matters depends on the burn rate: at 0.5 unit/h or more the replay found no collision without it (`../DESIGN_v2.md` §8.2). Until 2026-10-06 the deferred feature was a live re-read of the forecast; with the forecast parked, it is this.
 
 The metric that decides whether it is worth building is **near misses** — runs where the user became active while workers were still running (`../07_pipeline/DESIGN.md` §8).
 
 ## 6. Testing
 
-Concurrency tests: two supervisors competing for one repo, the slot semaphore at its cap, a worker killed mid-task. Acceptance for P4: budget respected within 1% of the meter with workers overlapping; a second task on a busy repo never starts; `GUARD_PCT` stops launches when the window fills.
+Concurrency tests: two supervisors competing for one repo, the slot semaphore at its cap, a worker killed mid-task. Acceptance for P4: budget respected within 1% of the meter with workers overlapping; a second task on a busy repo never starts; a task whose estimate exceeds what is left of `amount` never starts; the burn rate is measured per agent with 1, 2 and 3 workers.
 
 ## 7. Open points
 
-- **Burn rate** is unknown until P4 measures it, per agent and per model.
+- **Burn rate** is unknown until P4 measures it, per agent and per model — and it now decides whether prediction comes back (`../DESIGN_v2.md` §8.2).
 - **Account-level throttling** with several workers is unverified; `MAX_PARALLEL_PER_AGENT` rises only after measuring whether per-worker throughput degrades.
 - **Exact read-only flag set** for the installed Claude CLI version, to re-verify at P4.
-- **Live room re-check** (§5): deferred, and the first upgrade to make once the MVP runs.
+- **Noticing a user who arrives during a run** (§5): deferred; needed only if the burn rate is low.

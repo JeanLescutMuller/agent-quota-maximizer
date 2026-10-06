@@ -14,7 +14,7 @@ Budgeting answers *how much and by when*; this stage answers *from when, what, w
 
 ## 1. Lead time and execution profiles
 
-This is the only decision that ever puts the system in the user's way, and the only place `QUIET_HOURS` is used.
+This is the only decision that ever puts the system in the user's way, and the only place `QUIET_HOURS` is used. **Since 2026-10-06 it is half of the rule that replaces the forecast** (`../DESIGN_v2.md` §8.2): start just in time (this section), and never while the user is active (§3).
 
 ```text
 lead_time  = amount / intended_rate × SAFETY
@@ -23,10 +23,12 @@ start_after = deadline − lead_time
 
 `intended_rate` is **a policy choice, not a forecast**: it says how hard the system intends to burn, and therefore how early it must start. `QUIET_HOURS` selects one of two profiles, which set the rate, the parallelism and the model preference together:
 
-| Profile    | When                                     | `intended_rate`          | Workers                        | Models                 | Lead time for 0.9 unit            | Behaviour                                                                   |
+| Profile    | When                                     | `intended_rate`          | Workers                        | Models                 | Lead time for 0.75 unit           | Behaviour                                                                   |
 | ---------- | ---------------------------------------- | ------------------------ | ------------------------------ | ---------------------- | --------------------------------- | --------------------------------------------------------------------------- |
-| **gentle** | Inside `QUIET_HOURS` (00:00–09:00 local) | `GENTLE_RATE` 0.2 unit/h | 1                              | Cheap, long tasks      | 6h45 — longer than a whole window | Starts as soon as a window has an amount due, and trickles through the night |
-| **burst**  | Any other hour                           | `BOT_BURN_UNITS_PER_HOUR` 1.0 unit/h  | Up to `MAX_PARALLEL_PER_AGENT` | Expensive, short tasks | 1h20                              | Holds back, then burns hard near the end of the window                       |
+| **gentle** | Inside `QUIET_HOURS` (00:00–09:00 local) | `GENTLE_RATE` 0.2 unit/h | 1                              | Cheap, long tasks      | 5h37 — longer than a whole window | Starts as soon as a window has an amount due, and trickles through the night |
+| **burst**  | Any other hour                           | `BOT_BURN_UNITS_PER_HOUR` 1.0 unit/h  | Up to `MAX_PARALLEL_PER_AGENT` | Expensive, short tasks | 1h08                              | Holds back, then burns hard near the end of the window                       |
+
+The night profile only makes sense on a machine that is awake at night, which the Mac is not (`../CONSIDERATIONS.md` §20) — one more reason the bot runs on the VM.
 
 Why the two differ: during the user's hours a collision must be **short**, so the system waits and then burns fast — the worst case is being in the way until the window ends. At night there is nothing to collide with, so a slow cheap trickle is better: it leaves time to notice problems, and cheap models read more code per unit spent. Converting a bounded 5-hour risk into an unbounded 7-day one is exactly what this design refuses to do (`../03_budgeting/PREVIOUS_IDEAS.md` §4.5).
 
@@ -51,7 +53,7 @@ Why the two differ: during the user's hours a collision must be **short**, so th
 
 | Field | Where it comes from |
 |---|---|
-| `amount` | `budget.extra_quota_to_spend_units`, clamped by the room left in the window (§3) and by `MAX_DAILY_UNITS` minus what was already spent today |
+| `amount` | `budget.extra_quota_to_spend_units`, as is — or 0 while the user is active (§3). Until 2026-10-06 it was also clamped by a forecast-based room test and by `MAX_DAILY_UNITS`; both are gone (`../DESIGN_v2.md` §8.3) |
 | `spend_by_ts` | Straight from the budget (`../03_budgeting/DESIGN.md` §2) |
 | `start_after` | `deadline − lead_time(amount)` (§1): the moment work should begin, which is what makes the system hold back during the user's hours and trickle at night |
 | `profile`, `max_parallel` | The execution profile of §1, from `QUIET_HOURS` |
@@ -59,16 +61,23 @@ Why the two differ: during the user's hours a collision must be **short**, so th
 
 An agent with `amount = 0` has nothing to run; `spend_by_ts` and `start_after` are then `null`. The queue is candidates, not commitments: the executor pops from it, skips repos whose lock is held, and stops whenever budget or deadline says so. Re-running `aqm plan` after a run reflects the new staleness.
 
-## 3. The room test
+## 3. Not while the user is active
+
+**Replaced the room test on 2026-10-06.** The room test computed `1 − window_used − forecast` and clamped the amount with it; with no forecast, and the user's 25% reserve already in the budget, it had nothing left to do. What replaces it is an observation, not a prediction:
 
 ```text
-room = 1 − window_used − prediction.window.p95
-amount = min(budget.extra_quota_to_spend_units, room, MAX_DAILY_UNITS − spent_today)
+the user is active  =  in the last HUMAN_IDLE_MINUTES (30), the meter moved while none of
+                       this agent's bot tasks was running, or the user sent a prompt
+if the user is active:  amount = 0 for this tick, and nothing starts
 ```
 
-This is the general form of what would otherwise be a yes/no veto: a user spending right now produces a `p95` close to a full window, which leaves no room and keeps that agent out of the plan entirely, while a user who sent one small message does not. With a real predictor the same line also holds back work before a user who is merely *likely* to arrive.
+| Why | Measured (`../CONSIDERATIONS.md` §21) |
+|---|---|
+| Being active now is the strongest signal there is | On Claude, the user goes on to use more than 25% of a window within the hour in 19% of cases when active, 2% when not |
+| It is what the user asked for | An hour before the weekly reset, while they are working, the quota left is theirs — the budget alone would hand all of it to the bot |
+| It is cheap | 2–3 points of extra waste in the replay (`../DESIGN_v2.md` §8.2) |
 
-In the MVP this is the **only** place room is computed; the executor works to the frozen number and does not re-check it (`../06_execution/DESIGN.md` §5).
+**What the VM can see.** "The meter moved while no bot task was running" needs nothing but the meter and the VM's own process list, so it works on the VM, which cannot see the Mac's sessions. A prompt sent on the Mac is only visible where `agent-usage-tracker` records it, i.e. on the Mac. The check is made before a task starts, while the bot is idle; noticing a user who arrives *during* a run is harder, because the meter then moves for both, and stays open (`../06_execution/DESIGN.md` §5).
 
 ## 4. The queue
 
@@ -77,7 +86,7 @@ In the MVP this is the **only** place room is computed; the executor works to th
 | **Which repo, which category** | `rank = weight(repo) × weight(category) × staleness(pair)`, staleness growing with the time since that pair last ran (`state/pairs.json`) |
 | **Which agent** | One queue per agent, since each has its own budget; the same (repo, category) can appear in both, and whichever agent reaches it first takes the repo lock, so it runs once (`../06_execution/DESIGN.md` §2) |
 | **Which model and effort** | From the profile — cheap and long inside quiet hours, expensive and short outside — as a default the executor may escalate from |
-| **How big** | `estimate_units` from past runs of the same (category, model), used for the reservation of `../06_execution/DESIGN.md` §3 |
+| **How big** | `estimate_units` from past runs of the same (category, model), used for the reservation of `../06_execution/DESIGN.md` §3. A task's cost is stable in **dollars** (Claude) or **tokens** (Codex) whatever the plan's allocation does, so that is the unit it is measured in; it is converted to units through the trailing ratio of dollars or tokens to meter percent, measured on the bot's own runs |
 
 **Categories.** Three to start, each with its own prompt and cadence:
 

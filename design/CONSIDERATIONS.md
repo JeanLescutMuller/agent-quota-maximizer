@@ -4,7 +4,7 @@ Considerations, limitations, problem structure and constraints to keep in mind w
 
 **The problem.** Claude Code and Codex quotas are use-it-or-lose-it. Each agent enforces a 5-hour window nested inside a 7-day period, and whatever is left when the 7-day period resets is gone (no rollover). A heavy but irregular user rarely burns the whole allowance organically, so a slice of a paid resource is regularly wasted. Yet the same resource is precious while it lasts: interactive work must never be blocked by automation. The opportunity is to spend the surplus on useful, low-risk background work (software-maintenance reviews across the repos in `~/dev`), which raises four questions: when to spend, how much, on what, and how to run it.
 
-**How to read this file.** Sections 1–5 build the problem from a worked example, the user's tolerance and the measured quota facts. Sections 6–18 complete the picture by theme: structure of the waste, the user's human usage, triggering windows, tasks (value, risk, cost, selection), execution, agent differences, safety and outputs, environment.
+**How to read this file.** Sections 1–5 build the problem from a worked example, the user's tolerance and the measured quota facts. Sections 6–18 complete the picture by theme: structure of the waste, the user's human usage, triggering windows, tasks (value, risk, cost, selection), execution, agent differences, safety and outputs, environment. Sections 20–22 were measured on 2026-10-06: when the machine running the bot is awake, how the user's next hours depend on whether they are active now, and why the week meter can read one point low.
 
 ## 1. Illustrative example:
 
@@ -98,7 +98,7 @@ At the time of writing, the conclusions are:
 |                                     | Claude (Pro)                                                           | Codex (Plus)                                                                |
 | ----------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | 100% of the 5-hour window           | $32 (middle 80% of windows: $20–39)                                    | $20.5 (range $16.7–26.3)                                                    |
-| 100% of the week, in 5-hour windows | 8.85×, so about $283–314                                               | 6.2×, so about $127                                                         |
+| 100% of the week, in 5-hour windows | 8.85× on average, **but it drifts**: measured per week 10.1 (08-31, during the promo), 9.2, 8.2, 7.3, 7.6 (09-14 → 10-05) **[verified 2026-10-06]**, so about $243–314                                               | 6.2×, so about $127                                                         |
 | How the 5-hour window opens         | At the first message after the last one expired                        | Same                                                                        |
 | How the 7-day window resets         | Fixed: every Monday 19:00 UTC                                          | Starts at the first message after idle; sometimes reset early by the server |
 | What the API reports when idle      | `null`, 0%                                                             | A fake countdown: 0%, reset time = now + 5 h (or + 7 d)                     |
@@ -114,7 +114,7 @@ Consequences to keep in mind:
 - **Percent is the only currency both agents report, and the only one that is enforceable.** It is what actually runs out. Dollars exist only on Claude — now on three channels (every status-line render, every API request via OpenTelemetry, and a `-p` result object) — and always at *list* basis (`costBasis: "list"`): a different currency from the subscription meter, with a ±30% exchange rate. Tokens convert to percent by an unknown, variable factor. Enforce on percent, compare on dollars, diagnose on tokens.
 - **No meter reading carries a session id, and none can.** The meter is account-level, so attributing movement to the user rather than to this system cannot be done from the quota logs alone. It can be done from time intervals, because this system knows when its own work ran.
 - **The meter's resolution is 1% for both agents, and it is upstream's, not ours.** Not one fractional value appears among 255,156 recorded Claude push percentages and 11,314 poller percentages **[verified]**, so the quantum 1% ≈ $0.32 of a window and ≈ $2.8 of a week is inherent. The single sub-percent source is Codex's retroactive `plan_limit_history` (basis points, finished windows only).
-- **The polling fallback is unreliable.** 8,516 of 12,848 Claude poller rows carry a real error (SSL, HTTP 429, missing token); the free per-render push path does ~92% of the work. Codex has no push path and shares that transport, so the agent with the least visible usage depends most on the feed that fails most.
+- **The polling fallback was unreliable, and is no longer.** 8,516 of 12,848 Claude poller rows carried a real error (SSL, HTTP 429, missing token) up to 2026-10-04; over the 48 hours to 2026-10-05 it was 166 errors for 723 readings, with a median of 2 minutes between readings, and the only long gaps were the Mac asleep **[verified 2026-10-05]**. Before that fix, the free per-render push path does ~92% of the work. Codex has no push path and shares that transport, so the agent with the least visible usage depends most on the feed that fails most.
 - **Claude exposes per-session and per-request cost; Codex exposes neither.** Every status-line render receives cumulative session USD and cache statistics alongside the quota percentages, and Claude Code's OpenTelemetry export emits one event per API request with tokens and list-price USD — for headless runs too. Hooks receive none of it. All of it is recorded by `agent-usage-tracker` since 2026-09-30.
 - **Headless and interactive Claude runs are distinguishable in the recorded data, by two independent marks** **[verified 2026-10-04]**. A headless `-p` run renders no status line, so it produces no push row at all; and its telemetry events carry `query_source: "sdk"`, where an interactive conversation's carry `repl_main_thread`, `generate_session_title` or `prompt_suggestion`. Two headless runs in the recorded data each produced exactly one telemetry row and zero push rows. This is what makes our own spend separable without any bookkeeping of our own.
 - **Telemetry is complete per request but not guaranteed to arrive.** Claude Code pushes OpenTelemetry events in batches and buffers nothing on disk, so a receiver that is down loses them, and sessions started before the keys were set send none. Per-request dollars are therefore a *measurement* to reconcile against, never the authority: the authority stays the meter.
@@ -254,3 +254,43 @@ In some cases (5h-windows, and 7d-windows for Codex), we might want to automatic
 - **The concept.** A session stopped by a saturated 5-hour window sits idle until the user comes back, possibly hours after the reset. Resuming it automatically at the reset recovers that human work and starts the next window without the idle gap described in §8.
 - **Why a separate project.** It acts on the user's own sessions (human work), not on extra work. It is small, useful on its own, and can ship long before this project. It lives in `~/dev/agent-auto-resume`.
 - **Why it still matters here.** A queued resume is predictable human usage at the start of the next window (the best forecast input §7 can get). It already triggers the next window, so this project only needs to do so when nothing is queued. Extra work must not be scheduled into a window a resumed session is about to consume. The interface between the two projects is the pending-resume queue file written by `agent-auto-resume`.
+
+## 20. The machine the bot runs on [verified 2026-10-05]
+
+- **The MacBook is asleep about half the time, and most of every night.** `pmset -g log` over 2026-09-28 → 10-05: asleep 52% of the time, awake only about 14% of the hours between 00:00 and 08:00, about 70% between 09:00 and 22:00. Over the 42 days recorded, the pollers' rows (which only exist while the Mac is awake) tell the same story: 23–32% of night slots against about 60% in the day.
+- **It sleeps because the lid is closed on battery.** Of the transitions from full wake to sleep that week: clamshell sleep on battery (5), low-power sleep at 1% battery (2), idle sleep (5, one of them on battery at 23:55). `caffeinate` cannot keep a closed laptop on battery awake, and a LaunchAgent does not run while the Mac sleeps.
+- **A missed tick is a missed decision.** While the Mac sleeps no window is opened, nothing is spent, and the weekly reset arrives anyway. On 2026-10-05 at 20:06 the Claude week had 2.39 units (about $76) left 53 minutes before its reset; the Mac had slept from Sunday 23:55 to Monday 08:31.
+- **The Debian VM (`H-Frank-1`) is always on**: up 9 weeks without a reboot. Claude Code 2.1.240 is installed there and logged in with a Pro account; Codex is not installed. Only one repository is cloned there.
+- **The meter is server-side and account-wide, so any logged-in machine can read it.** Claude: `GET https://api.anthropic.com/api/oauth/usage` with the account's OAuth token — what `agent-usage-tracker`'s poller already calls, reading the token from the macOS keychain (on Linux, Claude Code keeps it in `~/.claude/.credentials.json`). Codex: `codex app-server`. What another machine cannot see is the Mac's own session files.
+
+## 21. The user's next hours depend on whether they are active now [verified 2026-10-06]
+
+Measured on the 42 recorded days; "active" means the user moved the meter or sent a prompt in the last 30 minutes, which is true of 10% of Claude slots and 5% of Codex ones.
+
+| The user uses more than 25% of a window within the next… | 1 h | 1.5 h | 3 h | 5 h |
+|---|---|---|---|---|
+| Claude, active now | 19% | 28% | 45% | 52% |
+| Claude, not active now | 2% | 3% | 7% | 13% |
+| Codex, active now | 1% | 6% | 13% | 14% |
+| Codex, not active now | 0% | 1% | 2% | 3% |
+
+- **Being active now is the strongest single predictor available**, about ten times on Claude, and it needs no model: it is read off the meter.
+- **The risk grows with the horizon even for an idle user**: 2% over one hour, 7% over three. How long the bot needs to run before a deadline therefore matters as much as whether the user is there when it starts.
+- Unconditionally, over any one hour the user exceeds 25% of a window in only 3.2% of spans; that low figure mixes the hours at the computer with the far more numerous hours away from it.
+
+## 22. Two Claude sources disagree on the week by one point [verified 2026-10-06]
+
+The status line (from the `/v1/messages` response headers, via Claude Code) and the poller (`/api/oauth/usage`) report the same meter, and read seconds apart they often differ by one point — the poller always ahead. Raw rows of 2026-10-04:
+
+| Time | Source | Window | Week |
+|---|---|---|---|
+| 10:32:42 | poller | 14.0 | **21.0** |
+| 10:34:37 | status line | 15 | **20** |
+| 10:34:45 | poller | 15.0 | 21.0 |
+| 10:36:49 | poller | 17.0 | **21.0** |
+| 10:37:10 | status line | 17 | **21** — four and a half minutes later |
+
+- **Neither the order of the rows nor any rounding of ours causes it.** Rows are ordered by when they were observed, `agent-usage-tracker` stores the status line's value as Claude Code sends it, and the poller's is the API's own float.
+- **The most likely cause is upstream truncation against rounding**: the header carries a fraction with two decimals, so 20.7% would show as 20 on the status line and 21 on the API. Not confirmed: one `ANTHROPIC_LOG=debug claude -p` run would show the raw header.
+- **It happens on the window meter too, but less visibly**, because that meter moves eight times faster through each point.
+- Over the recorded history, 85 Claude readings kept by ingestion show a week lower than an earlier reading of the same week: 62 by one point, 9 by two to five, 14 by more — the last mostly status-line rows of early September reporting a week of 0% while the week stood at 6–7%, cause unknown. Codex has none.

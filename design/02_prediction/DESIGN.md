@@ -1,5 +1,7 @@
 # 02 — Prediction (`aqm predict`)
 
+> **Parked on 2026-10-06 — kept, not deleted.** The design no longer forecasts: a fixed rule protects the user instead (`../DESIGN_v2.md` §8.2), because replaying the whole decision showed the forecast changes no outcome while the bot burns at 0.5 unit/h or more. This stage comes back only if the bot turns out slower than that (§9). Everything below describes the stage as built, and the code still runs it until P2b removes it from the tick.
+
 Stage 2 answers one question per agent: **how much human demand is still coming before the current 5-hour window ends?** It answers with a quantile rather than a flag, so the rest of the system is written against a real forecast from day one and needs no change when the forecast gets better.
 
 | | |
@@ -249,3 +251,29 @@ demand had a p95 of 87%. 42 days of one person is a single sample of a year, cel
 from n=18 to n=763, and the test set is now spent. The bench is checked in so that
 re-running it on a fresh test period costs one command — that is the next step here,
 not a sixth model.
+
+## 9. Parked on 2026-10-06, and what would bring it back
+
+**Why it is parked.** The study of §8 scored forecasters on their own, against every tick. Scoring the whole decision instead — budget, a just-in-time start, a bot burning quota, replayed over the 42 recorded days (`../../notebook/pipeline_replay.py`) — showed where a forecast can matter at all:
+
+| | Claude | Codex |
+|---|---|---|
+| Ticks where the week forces the bot to spend in the current window | 24% | 21% |
+| …of which the forecast lowers the amount | **3.1%** of all ticks | **0.1%** |
+| Outcome at a bot burn rate of 0.5 unit/h or more, forecast against the rule of `../DESIGN_v2.md` §8.2 | the same: no collision either way | the rule does better (0 collisions against 1 at 1 unit/h) |
+
+The reason is the just-in-time start. The bot only spends in the last hour or two of a window, and in the last hour the user exceeds the 25% reserve in 2% of cases when idle and 19% when active (`../CONSIDERATIONS.md` §21) — and the rule does not start while they are active. The forecast's job is already done by the start time, the reserve, and that observation.
+
+**What would bring it back: a slow bot.** The rule's protection shrinks as the bot's lead time grows. At 0.25 unit/h, 0.75 unit takes about 4½ hours to burn, and the replay gives 3 collisions and 5.4 hours of waiting on Claude without a forecast, against 2 and 1.1 hours with today's (`../DESIGN_v2.md` §8.2). So:
+
+```
+P4 measures the bot's burn rate, per agent, with 1, 2 and 3 parallel workers
+   >= 0.5 unit/h   the rule stands; this stage stays parked
+   <  0.5 unit/h   more workers first; if still below, this stage comes back,
+                   with the same contract (§1) and the bench of §8 to choose its engine
+```
+
+What a returning forecast would need to predict is no longer "the rest of the current window from now", but the user's demand **over the bot's lead time**, starting from a moment when they are idle — the case where the study of §8 found today's engine weakest (`idle`/morning).
+
+**What stays.** The bench (`lab/`, the notebooks of this folder), `aqm predict` as a command for analysis, and this document. What leaves the tick: the prediction artifact, its staleness check in budget, and the five parameters listed in `../07_pipeline/DESIGN.md` §11.
+

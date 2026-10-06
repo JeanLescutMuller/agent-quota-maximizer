@@ -13,6 +13,7 @@ job cannot break when a Conda environment moves).
 |---|---|
 | `explain_budget.ipynb` | **Where a budget decision comes from.** One decision taken apart: every measurement, intermediate value and step of arithmetic, in the order the pipeline computes it |
 | `explain.py` | The loading and plotting helpers the notebook imports |
+| `pipeline_replay.py` | **Replays the whole decision over the recorded history** — budget, a just-in-time start, a bot burning quota — and counts waste left at each reset and the times the bot made the user wait. Every figure behind `../design/DESIGN_v2.md` §8 comes from it. Standard library only: `/usr/bin/python3 notebook/pipeline_replay.py`, about 10 s |
 
 ## Using it
 

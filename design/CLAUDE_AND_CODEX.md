@@ -12,7 +12,7 @@ Sources: 155 Claude transcript files (~24,000 priced messages) and 110,795 quota
 
 | | Claude (Pro) | Codex (Plus) |
 |---|---|---|
-| Weekly capacity | ≈ 8.85 five-hour windows ≈ **$283** | ≈ 6.2 five-hour windows ≈ **$127** |
+| Weekly capacity | ≈ 8.85 five-hour windows ≈ **$283** — but drifting: 10.1 → 7.6 over five weeks, so measured since 2026-10-06 (`03_budgeting/DESIGN.md` §2) | ≈ 6.2 five-hour windows ≈ **$127** — weakly measured, the feed is sparse |
 | 100% of one 5-hour window | $32 (middle 80%: $20–39) | $20.5 (range $16.7–26.3) |
 | **Weekly peaks observed** | **81%, 88%, 10%, 27%, 47%** | **46%, 36%, 30%, 2%, 0%** |
 | Mean weekly peak | ≈ 51% **[derived]** | ≈ 23% **[derived]** |
@@ -112,7 +112,7 @@ The one asymmetry is confidence in the deadline: Claude's is exact, Codex's is u
 
 - **Separate state per agent** (`data/<agent>/slots.csv` holds an `agent` column, and the meter file is per agent), one artifact per tick with a section per agent, separate budgets, separate parameters, separate daily caps.
 - **One supervisor covers both**, since their quotas are independent and the plan carries both mandates. What they share is the repo locks and the global worker cap (`06_execution/DESIGN.md` §2).
-- **The room test is per agent.** The user working in Claude does not keep Codex extra work out of the plan, and vice versa — they are separate quotas — but a shared machine means both compete for CPU, which `MAX_PARALLEL_TOTAL` bounds.
+- **The "user is active" check is per agent** (`05_planning/DESIGN.md` §3; the room test until 2026-10-06). The user working in Claude does not keep Codex extra work out of the plan, and vice versa — they are separate quotas — but a shared machine means both compete for CPU, which `MAX_PARALLEL_TOTAL` bounds.
 - **Waste is measured per agent**, and the notebook reports both (`07_pipeline/DESIGN.md` §8).
 
 ## 7. What is still unknown

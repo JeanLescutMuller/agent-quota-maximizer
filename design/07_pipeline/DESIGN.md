@@ -76,7 +76,7 @@ aqm pipeline:
   config = load_config()                              # invalid or unreadable → exit "config error"
   if not config.enabled:                              exit "disabled"
   if the pipeline lock is held:                       exit "busy"
-  ingest(); predict(); budget()                       # stages 1-3, read-only
+  ingest(); budget()                                  # stages 1 and 3, read-only; stage 2 parked 2026-10-06
   housekeeping()                                      # log rotation, daily counter, artifact and report pruning
   per agent with extra_quota_to_spend_units > 0:                      # the guard is per agent, not global
       if its reading is older than READING_MAX_AGE_SECONDS:   drop it, decision "stale"
@@ -84,7 +84,7 @@ aqm pipeline:
       # that one with `no meter reading`, and one missing agent must not stop the
       # other's tick
   start_windows()                                     # stage 4, its own guards
-  plan()                                              # stage 5: amount, deadline, start_after, queue
+  plan()                                              # stage 5: amount (0 while the user is active), deadline, start_after, queue
   if no agent has amount ≥ MIN_TASK_BUDGET:           exit "nothing due"
   if the executor lock is held:                       exit "already working"
   if every agent's start_after is in the future:      exit "too early"
@@ -92,10 +92,10 @@ aqm pipeline:
 
 aqm execute (reads the latest plan, once):
   per agent with amount ≥ MIN_TASK_BUDGET and now ≥ start_after:
-      run its queue until amount, deadline, GUARD_PCT or config says stop
+      run its queue until amount, deadline or config says stop
 ```
 
-The room test that keeps a busy agent out of the plan entirely is part of stage 5 (`../05_planning/DESIGN.md` §3), and in the MVP that is the only time room is computed.
+The check that keeps an agent whose user is active out of the plan entirely is part of stage 5 (`../05_planning/DESIGN.md` §3); it replaced the room test on 2026-10-06.
 
 One supervisor covers both agents, since the plan carries both mandates and their quotas are independent; what they share is the repo locks and the global worker cap.
 
@@ -103,11 +103,11 @@ One supervisor covers both agents, since the plan carries both mandates and thei
 
 | Risk                                          | Mitigation                                                                                                               |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Runaway spending                              | `amount` per window and per agent, `MAX_DAILY_UNITS` per day, `MIN_TASK_BUDGET` at the tail end                           |
+| Runaway spending                              | `amount` per window and per agent, `MIN_TASK_BUDGET` at the tail end; the budget re-reads the real week percent every tick (`MAX_DAILY_UNITS` removed 2026-10-06)                           |
 | Overshoot multiplied by parallelism           | Reservation before launch (`../06_execution/DESIGN.md` §3)                                                               |
 | Two tasks in one repo                         | Repo lock across agents (`../06_execution/DESIGN.md` §2)                                                                 |
 | Machine overloaded                            | `MAX_PARALLEL_TOTAL` slot semaphore (§4)                                                                                 |
-| Blocking the user                             | Late start, the room test at plan time, `GUARD_PCT` during the run, `MIN_HUMAN_RESERVE_PCT` never filled                            |
+| Blocking the user                             | Late start, nothing starts while the user is active, `MIN_HUMAN_RESERVE_PCT` never filled, the window that outlives the weekly reset only filled before it (`../DESIGN_v2.md` §8.2)                            |
 | Writing to a repo                             | Read-only flags and sandbox (`../06_execution/DESIGN.md` §2); reports written outside repos                              |
 | Secrets in reports                            | Excluded repos in config, prompt instruction, scrubber (`../05_planning/DESIGN.md` §5)                                   |
 | Bad config                                    | Invalid or unreadable config is a hard stop: nothing runs                                                                |
@@ -233,7 +233,7 @@ Together they answer the questions worth asking, with the definitions a notebook
 | Extra spend            | Sum of `slot_window_bot_pct` in `data/<agent>/slots.csv` over the week                                                                                                   |
 | **Blocking incidents** | Organic activity meeting a saturated 5-hour window within `BLOCKING_WINDOW` of extra work running in that window — **the number that must stay at zero** |
 | Near misses            | Runs where the user became active while workers were still running — the metric that decides whether the live room re-check is worth building (`../06_execution/DESIGN.md` §5) |
-| Forecast calibration   | Share of windows where actual human demand exceeded the predicted p95; should be ≤ 5%                                                           |
+| Forecast calibration   | Parked with stage 2 on 2026-10-06. Replaced by **the burn rate** (below), which is what now decides whether a forecast is needed |
 | Burn rate              | Median units per hour, per model, per worker and aggregate                                                                                        |
 | Unreachable quota      | `already_lost_units` from the last tick before each reset                                                                                                |
 
@@ -246,6 +246,8 @@ Each stage owns its own tests (see its DESIGN.md). Across stages:
 - **Dry run end to end** before anything may spend.
 
 ## 10. Deployment
+
+**Target since 2026-10-06: the Debian VM** (`../DESIGN_v2.md` §8.1), as a systemd `--user` service and timer with `loginctl enable-linger`, the unit files living in `~/opt/agent-quota-maximizer/` and only symlinked into `~/.config/systemd/user/` (`~/AGENTS.md`). The Mac's LaunchAgent below is what exists today, and stays until P2b.
 
 Status: **the LaunchAgent, `install.sh`, `uninstall.sh`, the plist and the config template are built; stages 4 and 6 are not, so a tick ends at `budget` and nothing can act.**
 
@@ -265,15 +267,17 @@ Development happens only in `~/dev/agent-quota-maximizer/release/` (`~/AGENTS.md
 
 | Parameter                              | Meaning                                                                                                               | Value             |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| `MIN_HUMAN_RESERVE_PCT`                | Share of a window never offered to the bot. **In percent**, so it compares directly against `predicted_p95_human_usage_pct` and against `GUARD_PCT`. **Measured, not chosen** (`../02_prediction/DESIGN.md` §8): the forecast is exactly 0 on 73.6% of ticks, and on those the human's demand to the window's end has a 90.9th percentile of 26% | 25 %              |
-| `SAFETY_MULTIPLIER` | The quantile multiplier turning the measured human rate into a p95. There is no horizon parameter: the forecast always runs to the window's end (`../02_prediction/DESIGN.md` §1.1). **Measured**: 2, 3 and 5 all cost more (§8 there) | 1.5 |
+| `MIN_HUMAN_RESERVE_PCT`                | Share of every window never offered to the bot — **the only reserve since 2026-10-06**: no forecast, no `GUARD_PCT`. **Measured, not chosen** (`../02_prediction/DESIGN.md` §8): on idle ticks the user's demand to the window's end has a 90.9th percentile of 26%; the replay of `../DESIGN_v2.md` §8 found 25 to 40 equally good for waste | 25 %              |
+| `HUMAN_IDLE_MINUTES` **[added 2026-10-06]** | Nothing starts while the user is active: they moved the meter while no bot task of that agent ran, or sent a prompt, within this many minutes (`../05_planning/DESIGN.md` §3). Measured basis: on Claude the next hour exceeds 25% of a window in 19% of cases when active against 2% when not (`../CONSIDERATIONS.md` §21) | 30 min |
+| ~~`WEEK_CAPACITY_UNITS`~~ → `week_capacity_units` **measured since 2026-10-06** | How many units one week holds. Was a constant (8.85 Claude, 6.2 Codex); now measured over the last two complete weeks (`../03_budgeting/DESIGN.md` §2) | measured |
+| ~~`SAFETY_MULTIPLIER`~~ **parked with stage 2** (`../02_prediction/DESIGN.md` §9) | The quantile multiplier turning the measured human rate into a p95. There is no horizon parameter: the forecast always runs to the window's end (`../02_prediction/DESIGN.md` §1.1). **Measured**: 2, 3 and 5 all cost more (§8 there) | 1.5 |
 | `WINDOW_GAP_SECONDS`                           | Assumed gap between consecutive windows                                                                               | 5 min             |
 | `DEADLINE_MARGIN_SECONDS`                      | Safety before a window's end                                                                                           | 5 min             |
-| `BURN_LOOKBACK_MINUTES`                | Span over which the recent human burn rate is measured                                                                | 30 min            |
-| `MIN_RATE_DENOMINATOR_MINUTES`         | Floor on the divisor of the *window-average* burn rate. Flooring it at `BURN_LOOKBACK_MINUTES` instead halved the measured pace of any window younger than 30 minutes, which understates the reserve — the dangerous direction (`../02_prediction/DESIGN.md` §2) | 10 min            |
-| `ACTIVE_HUMAN_BURN_RATE`               | Floor on the human rate when the active-human floor fires before the meter has moved. **In percent of a 5-hour window per minute**, because that is the unit a limit is enforced in (`../CONSIDERATIONS.md` §5); the intent was $0.05/min, which at $32 a unit is 0.156 | 0.15 %/min        |
+| ~~`BURN_LOOKBACK_MINUTES`~~ **parked with stage 2** (`../02_prediction/DESIGN.md` §9)                | Span over which the recent human burn rate is measured                                                                | 30 min            |
+| ~~`MIN_RATE_DENOMINATOR_MINUTES`~~ **parked with stage 2** (`../02_prediction/DESIGN.md` §9)         | Floor on the divisor of the *window-average* burn rate. Flooring it at `BURN_LOOKBACK_MINUTES` instead halved the measured pace of any window younger than 30 minutes, which understates the reserve — the dangerous direction (`../02_prediction/DESIGN.md` §2) | 10 min            |
+| ~~`ACTIVE_HUMAN_BURN_RATE`~~ **parked with stage 2** (`../02_prediction/DESIGN.md` §9)               | Floor on the human rate when the active-human floor fires before the meter has moved. **In percent of a 5-hour window per minute**, because that is the unit a limit is enforced in (`../CONSIDERATIONS.md` §5); the intent was $0.05/min, which at $32 a unit is 0.156 | 0.15 %/min        |
 | `READING_MAX_AGE_SECONDS`                      | Freshness required of a meter reading                                                                                 | 10 min            |
-| `ARTIFACT_MAX_AGE_SECONDS`                        | Freshness required of an input artifact, i.e. two ticks (§1.1)                                                        | 10 min            |
+| ~~`ARTIFACT_MAX_AGE_SECONDS`~~ **parked with stage 2** (`../02_prediction/DESIGN.md` §9)                        | Freshness required of an input artifact, i.e. two ticks (§1.1)                                                        | 10 min            |
 | `READ_TAIL_KB`                         | Starting tail read, doubled until it reaches past the watermark (`../01_ingestion/DESIGN.md` §4)                      | 64 KB             |
 | `ROLLUP_BUCKET`                        | Rollup granularity                                                                                                    | 5 min             |
 | `QUIET_HOURS`                          | Hours using the gentle profile                                                                                        | 00:00–09:00 local |
@@ -282,10 +286,10 @@ Development happens only in `~/dev/agent-quota-maximizer/release/` (`~/AGENTS.md
 | `ESCALATE_RATE`                        | Required rate above which models and workers escalate                                                                 | 0.5 unit/h        |
 | `WINDOW_OPEN_COOLDOWN`                 | Between two opening attempts                                                                                          | 15 min            |
 | `MIN_TASK_BUDGET`                      | Below this, do not start another task                                                                                 | 0.05 unit         |
-| `MAX_DAILY_UNITS`                      | Cap on extra work per day, per agent                                                                                  | 3 units           |
+| ~~`MAX_DAILY_UNITS`~~ **removed 2026-10-06** | Was a cap on bot work per day. The 5-hour windows already cap a day at about 3.6 units, and the last day before a reset needs up to 3.75 (`../DESIGN_v2.md` §8.3) | — |
 | `MAX_PARALLEL_PER_AGENT`               | Workers per agent                                                                                                     | 2                 |
 | `MAX_PARALLEL_TOTAL`                   | Workers on the machine                                                                                                | 3                 |
-| `GUARD_PCT`                            | Window room below which running workers are terminated                                                                | 15%               |
+| ~~`GUARD_PCT`~~ **removed 2026-10-06** | Was the window room below which running workers were killed: the reserve's job a second time (`../DESIGN_v2.md` §8.3) | — |
 | `GRACE`                                | Time given to workers after the deadline                                                                              | 2 min             |
 | `METER_POLL`                           | Meter re-read interval in a supervisor                                                                                | 60 s              |
 | `TASK_TIMEOUT`                         | Wall clock per task                                                                                                   | 20 min            |

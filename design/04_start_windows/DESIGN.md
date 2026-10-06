@@ -46,7 +46,7 @@ On Codex the stakes are higher still: the 7-day period itself starts at the firs
 
 ## 4. The message
 
-`claude -p "ok"` (or `codex exec`) with the cheapest model, a pre-generated session id, and all tools disallowed. It is recorded like any other spend, tagged **extra** so it is never learned as user activity (`../01_ingestion/DESIGN.md` §6), and it counts towards `MAX_DAILY_UNITS`.
+`claude -p "ok"` (or `codex exec`) with the cheapest model, a pre-generated session id, and all tools disallowed. It is recorded like any other spend, tagged **extra** so it is never learned as user activity (`../01_ingestion/DESIGN.md` §6).
 
 Within two ticks the system verifies that the meter now shows an open window; if not, it logs a failed opening and retries after the cooldown. A pending resume queued by `agent-auto-resume` also opens windows, and the cooldown keeps the two from racing.
 

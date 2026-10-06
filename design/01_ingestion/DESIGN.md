@@ -17,6 +17,8 @@ Facts marked **[verified]** were measured on this machine, on 2026-10-04 where a
 
 ## 1. Attribution: separating the user's spend from ours
 
+> **Since 2026-10-06 no decision reads this attribution, and §1.3–§1.4 will not be built** (`../DESIGN_v2.md` §8). The budget works from the meter level, which does not care who spent; the forecast that needed the user's share alone is parked; and the bot runs on the VM, so its own spend is simply what the VM ran. `slot_window_human_pct` stays in `slots.csv` for analysis, computed as today from our run intervals (§1.2). The section is kept as the record of why per-session percent cannot exist.
+
 Everything this system decides rests on one question: **how much of the quota the user spent, as opposed to us.** This section is the whole answer.
 
 ### 1.1 Per-session percent does not exist, and cannot
@@ -48,7 +50,7 @@ The subtraction above sounds lossy. It mostly is not, because **our runs and the
 | Our workers ran, no human signal | Our bursts, ~20 min at a time | `slot_window_bot_pct = slot_window_used_pct` | `exact` |
 | Our workers ran **and** the user was active | Rare **by design** | §1.4 | `apportioned` or `censored` |
 
-The third row is rare because the whole architecture exists to keep it empty: the late start, the room test, `GUARD_PCT`, and the fact that "blocking incidents" is already **the metric that must stay at zero** (`../07_pipeline/DESIGN.md` §8). Overlap is not a normal case to be modelled — it is an incident already being counted.
+The third row is rare because the whole architecture exists to keep it empty: the late start, not starting while the user is active (`../05_planning/DESIGN.md` §3), and the fact that "blocking incidents" is already **the metric that must stay at zero** (`../07_pipeline/DESIGN.md` §8). Overlap is not a normal case to be modelled — it is an incident already being counted.
 
 **Detecting which case applies needs no estimation.** `workers > 0` comes from our own run records; human activity during the interval comes from the liveness tripwire (§3) and from any human session's own push rows. Both are facts, not inferences.
 
@@ -255,6 +257,8 @@ A useful sanity check falls out: 46 windows over 40.8 days is 1.13 a day, which 
 
 A dropped fake countdown is recorded as `is_window_open`, which is what the window starter reads (`../04_start_windows/DESIGN.md`).
 
+**The week meter obeys the same rule, and did not until 2026-10-06.** The filter above keeps a reading when the *window* percent reaches a new high, and takes the week percent along with it unchecked. But the two Claude sources disagree on the week by one point, the poller always ahead (`../CONSIDERATIONS.md` §22), so a status-line reading kept for its new window high can carry a week one point *below* the poller reading kept just before it. On 2026-10-04: poller at 10:32:42, window 14 and week 21, kept; status line at 10:34:37, window 15 and week **20**, kept; poller at 10:36:49, window 17 and week 21, kept. The week went 21 → 20 → 21, and every round trip counted one more point of weekly movement: `slot_week_used_pct` summed to **111% for a week whose peak was 73%**, and the latest reading — what budgeting reads — could be a point low. The fix is the rule already applied to the window: **within one week the true percentage never decreases**, so the week level kept is the running maximum per `week_end_ts`, and a reading below it moves nothing.
+
 ## 6. The prepared table
 
 Two files, both JSONL, both append-only.
@@ -449,6 +453,8 @@ Because it is this cheap, the derived files are **disposable**: "corrupted state
 Its real product is not the state files but the **training set**: 46 Claude and 39 Codex windows with their shapes, which is what any predictor beyond the current rate extrapolation has to be fitted on (`../02_prediction/DESIGN.md` §6).
 
 ## 12. Open points
+
+- **The VM needs its own meter reader** (`../DESIGN_v2.md` §8.1). Today this stage reads `agent-usage-tracker`'s files on the Mac, filled by the Mac's status line and pollers; the VM has neither. Either `agent-usage-tracker`'s two pollers are deployed to the VM — the Claude one reads its token from the macOS keychain, where on Linux Claude Code keeps it in `~/.claude/.credentials.json` — or this stage calls the two endpoints itself. The first keeps one owner for the feeds and is preferred. On the VM the Claude meter is poll-only, every two to five minutes, since no status line renders there.
 
 - **Fractional percent.** Not available live for either agent: the upstream quota is whole-percent (`USAGE_DATA_REFERENCE.md` §5.1). The only sub-percent source is Codex's retroactive `plan_limit_history` — final usage per finished window in basis points, with the window's *real* start and end (`USAGE_DATA_REFERENCE.md` §3.2). It is useless live (it lags to the start of the UTC day, and only 4 fetches exist so far **[verified]**), but it is **ground truth for backtesting**: a Codex window's true final usage at 0.01% resolution, against which this stage's reconstruction from 1%-quantised readings can be scored. `../02_prediction/DESIGN.md` §6 is where that belongs.
 - **Telemetry coverage is new and thin.** Only 66 telemetry rows exist, across 3 sessions, over the first 4 days **[verified 2026-10-04]** — sessions started before the keys were set send none. §1.4's per-request apportionment is therefore designed against a feed whose steady-state completeness is not yet observed. It degrades to `censored`, so this delays precision rather than blocking P0.
